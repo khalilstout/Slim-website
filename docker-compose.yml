@@ -1,0 +1,74 @@
+# Environnement de développement local.
+#   docker compose up --build       → boutique sur http://localhost:8080
+#   docker compose run --rm frontend-build → recompiler le front (puis recharger la page)
+#   docker compose down -v          → tout effacer (base comprise) pour repartir de zéro
+#   docker compose --profile front up frontend → front seul, données de démo, http://localhost:5173
+#
+# Les identifiants par défaut ci-dessous ne valent que pour le développement
+# local ; ils se surchargent dans un fichier .env (voir .env.example).
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-prestashop}
+      MYSQL_DATABASE: prestashop
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h localhost -p$$MYSQL_ROOT_PASSWORD --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  prestashop:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      frontend-build:
+        condition: service_completed_successfully
+    ports:
+      - '${PS_PORT:-8080}:80'
+    environment:
+      DB_SERVER: db
+      DB_USER: root
+      DB_PASSWD: ${DB_PASSWORD:-prestashop}
+      DB_NAME: prestashop
+      PS_DOMAIN: localhost:${PS_PORT:-8080}
+      PS_INSTALL_AUTO: 1
+      PS_LANGUAGE: fr
+      PS_COUNTRY: FR
+      PS_DEV_MODE: 1
+      PS_FOLDER_ADMIN: admin-dev
+      ADMIN_MAIL: ${ADMIN_MAIL:-admin@example.com}
+      ADMIN_PASSWD: ${ADMIN_PASSWD:-slimroom-dev}
+    volumes:
+      - ps-data:/var/www/html
+      # En développement, le module et le front compilé viennent directement du
+      # dépôt : une modification est visible sans reconstruire l'image.
+      - ./prestashop/modules/slimroom:/var/www/html/modules/slimroom
+      - ./frontend/dist:/var/www/html/modules/slimroom/views/dist
+
+  # Compile le front avant le démarrage de la boutique.
+  frontend-build:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci --no-audit --no-fund && npm run build"
+    volumes:
+      - ./frontend:/app
+
+  # Serveur de développement du front seul (rechargement à chaud, données de démo).
+  frontend:
+    profiles: [front]
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install --no-audit --no-fund && npm run dev"
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./frontend:/app
+
+volumes:
+  db-data:
+  ps-data:
