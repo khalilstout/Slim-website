@@ -96,6 +96,7 @@ Trois workflows dans `.github/workflows/`.
 | Job | Ce qu'il cherche | Bloquant |
 | --- | --- | --- |
 | Dépendances npm | Failles connues (`npm audit`) : dès « modéré » pour ce qui part chez les visiteurs, dès « élevé » pour les outils. | oui |
+| Nouvelles dépendances | Une pull request qui ajoute une dépendance vulnérable. | oui |
 | CodeQL | Failles dans le TypeScript et dans les workflows. Résultats dans l'onglet « Security » du dépôt. | oui |
 | Semgrep | Failles dans le PHP du module (que CodeQL n'analyse pas), le TypeScript, le Dockerfile, les workflows ; secrets. | oui |
 | Trivy · dépôt | Dépendances vulnérables, secrets, mauvaise configuration Docker. | oui |
@@ -105,11 +106,10 @@ Trois workflows dans `.github/workflows/`.
 Le passage du lundi sert à être prévenu d'une faille publiée entre-temps, même
 si personne n'a touché au code.
 
-À activer une fois dans les réglages du dépôt (« Settings » → « Advanced
-Security ») : « Dependency graph » et « Dependabot alerts ». GitHub prévient
-alors par e-mail dès qu'une faille touche une dépendance, et Dependabot ouvre
-la pull request de correction. Ce n'est pas activé aujourd'hui ; `npm audit`
-et Trivy couvrent le même besoin dans la CI en attendant.
+Deux réglages du dépôt sont activés (« Settings » → « Advanced Security ») :
+« Dependency graph » et « Dependabot alerts ». GitHub prévient par e-mail dès
+qu'une faille touche une dépendance, et le job « Nouvelles dépendances » en a
+besoin : s'il échoue avec « Forbidden », c'est que ce réglage a été coupé.
 
 ### `pages.yml` — push sur `main` qui touche `frontend/`
 
