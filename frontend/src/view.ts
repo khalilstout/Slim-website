@@ -365,7 +365,7 @@ export function createRoomView(
       // Glisser pour regarder autour : on « tire » le décor, comme sur une carte.
       dragging ||= Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8;
       if (dragging) {
-        const speed = (camera.fov * Math.PI) / 180 / canvas.clientHeight;
+        const speed = (insideView.dragSpeed * camera.fov * Math.PI) / 180 / canvas.clientHeight;
         look.turn += e.movementX * speed;
         look.tilt += e.movementY * speed;
         limitLook();
@@ -561,7 +561,7 @@ export function createRoomView(
       look.tilt -= look.edgeY * insideView.edgeSpeed * 0.6 * dt;
       limitLook();
       const [aimYaw, aimPitch] = aimedAngles();
-      const ease = 1 - Math.exp(-dt * 4.5);
+      const ease = 1 - Math.exp(-dt * 6); // amorti : le regard rejoint sa cible sans à-coup
       camera.position.lerp(look.eye, ease);
       yaw += shortestTurn(yaw, aimYaw) * ease;
       pitch += (aimPitch - pitch) * ease;

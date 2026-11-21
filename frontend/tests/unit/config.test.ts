@@ -94,6 +94,8 @@ describe('vue intérieure', () => {
       expect(fov).toBeGreaterThanOrEqual(40);
       expect(fov).toBeLessThanOrEqual(95);
     }
+    expect(insideView.dragSpeed).toBeGreaterThanOrEqual(1);
+    expect(insideView.dragSpeed).toBeLessThanOrEqual(4); // au-delà, le décor file trop vite pour être lisible
     expect(insideView.maxTurn).toBeGreaterThan(0);
     expect(insideView.maxTurn).toBeLessThanOrEqual(Math.PI);
     expect(insideView.maxTilt).toBeLessThan(Math.PI / 2);

@@ -257,6 +257,7 @@ Réglages : `frontend/src/config.ts`, objet `insideView`.
 | `characterStart` | Où le bonhomme attend dans cette vue. |
 | `fov`, `fovPortrait` | Angle de champ sur écran large et sur téléphone tenu droit. |
 | `maxTurn`, `maxTilt` | Jusqu'où on peut tourner la tête et lever ou baisser les yeux. |
+| `dragSpeed` | Ampleur du regard quand on glisse : 1 = le décor suit le doigt, 2 = deux fois plus. |
 | `edgeSpeed` | Vitesse du regard quand la souris touche un bord. |
 
 D'où la caméra regarde un objet : elle se place toute seule à côté, de biais

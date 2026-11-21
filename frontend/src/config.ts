@@ -141,6 +141,11 @@ export const insideView = {
   maxTurn: 2.1,
   /** Jusqu'où on peut lever ou baisser les yeux, en radians. */
   maxTilt: 0.55,
+  /**
+   * Ampleur du regard quand on glisse (souris ou doigt). 1 = le décor suit
+   * exactement le doigt ; 2 = un même geste fait tourner deux fois plus.
+   */
+  dragSpeed: 2.2,
   /** Vitesse du regard quand la souris touche un bord de l'écran (radians par seconde). */
   edgeSpeed: 1.1,
 };
