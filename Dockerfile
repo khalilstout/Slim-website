@@ -1,7 +1,7 @@
 # Image de la boutique : PrestaShop + module slimroom + front 3D compilé.
 # La même image sert en local (docker compose) et servira pour le cloud.
 
-FROM node:22-alpine AS frontend
+FROM node:26-alpine AS frontend
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
