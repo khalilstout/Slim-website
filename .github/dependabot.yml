@@ -25,3 +25,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Un changement de version majeure de la base de données se décide et se
+      # teste à la main (compatibilité PrestaShop, migration des données).
+      - dependency-name: mysql
+        update-types: ['version-update:semver-major']
