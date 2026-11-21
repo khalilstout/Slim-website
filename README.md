@@ -51,7 +51,7 @@ Commandes utiles :
 | `frontend/src/assets/` | Le modèle 3D de la chambre et ses textures, prêts pour le web. |
 | `frontend/tests/` | Tests unitaires (`unit/`) et tests navigateur (`e2e/`). |
 | `Ressources/bundle_001/` | Sources Blender et textures d'origine de la chambre. |
-| `tools/` | Scripts ponctuels (agrandissement de la texture de la chambre). |
+| `tools/` | Scripts de fabrication : le bonhomme (Blender), l'agrandissement de la texture de la chambre. |
 | `tests/integration/` | Test d'une vraie boutique PrestaShop en fonctionnement. |
 | `prestashop/modules/slimroom/` | Module PrestaShop : affiche la chambre en page d'accueil et fournit l'API catalogue / panier. |
 | `prestashop/post-install/` | Script lancé une fois après l'installation de PrestaShop (installe le module). |
@@ -71,9 +71,9 @@ Commandes utiles :
   la porte sont dessinés par le code en attendant ceux du modèle, et la texture
   de la chambre est un agrandissement de celle de 768 pixels : nette, mais sans
   détail supplémentaire.
-- Le bonhomme est construit en formes simples dans le code, d'après une photo
-  de référence : ce n'est pas un modèle sculpté par un graphiste. Un vrai
-  modèle animé pourra le remplacer sans toucher au reste (voir le guide).
+- Le bonhomme est un modèle fabriqué par un script Blender
+  (`tools/build-character.py`), d'après une photo de référence : un personnage
+  stylisé, pas un portrait ni un modèle sculpté par un graphiste.
 - Les deux grands posters et l'écran de l'ordinateur n'ont pas encore leur
   image définitive : ils affichent un contenu provisoire (voir le guide,
   section 7).

@@ -170,6 +170,11 @@ function insideViewpoint(item: Interactable, center: THREE.Vector3, stand: [numb
 export interface RoomView {
   /** Résolue quand l'animation d'arrivée est terminée. */
   ready: Promise<void>;
+  /**
+   * Vue intérieure : fait entrer la caméra dans la pièce (elle attend dehors,
+   * devant l'écran d'entrée). Sans effet si c'est déjà fait, ou en vue d'ensemble.
+   */
+  enter(): void;
   /** Centre la caméra sur un objet, ou revient à la vue de départ avec `null`. */
   focus(id: string | null): void;
   /**
@@ -186,6 +191,8 @@ export function createRoomView(
   interactables: Interactable[],
   onSelect: (id: string) => void,
   mode: ViewMode = 'outside',
+  /** Modèle du bonhomme (voir character.ts) ; `null` = pas de bonhomme. */
+  characterModel: THREE.Object3D | null = null,
 ): RoomView {
   const inside = mode === 'inside';
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -218,11 +225,11 @@ export function createRoomView(
 
   // Le bonhomme est le seul objet éclairé de la scène (la chambre a ses lumières peintes).
   const insideStart = insideView.characterStart;
-  const character = !characterSettings.enabled
+  const character = !characterModel
     ? null
     : inside
-      ? createCharacter(insideStart, Math.atan2(insideView.eye[0] - insideStart[0], insideView.eye[2] - insideStart[1]))
-      : createCharacter();
+      ? createCharacter(characterModel, insideStart, Math.atan2(insideView.eye[0] - insideStart[0], insideView.eye[2] - insideStart[1]))
+      : createCharacter(characterModel);
   if (character) {
     stage.add(character.object);
     scene.add(new THREE.HemisphereLight(0xfff3e6, 0xa8684a, 2.1));
@@ -413,6 +420,7 @@ export function createRoomView(
   const inset = { right: 0, bottom: 0 }; // place prise par le panneau, valeur visée
   const shift = { x: 0, y: 0 }; // décalage affiché, qui rejoint la valeur visée en douceur
   let started = false;
+  let arrived = false; // l'animation d'arrivée est terminée
 
   /** Vue d'ensemble : distance à laquelle la chambre remplit l'espace laissé libre par le panneau. */
   function frameRoom() {
@@ -447,7 +455,7 @@ export function createRoomView(
     if (!width || !height) return;
     renderer.setSize(width, height);
     camera.aspect = width / height;
-    if (inside) camera.fov = width < height ? insideView.fovPortrait : insideView.fov;
+    if (inside && arrived) camera.fov = width < height ? insideView.fovPortrait : insideView.fov;
     applyShift();
     camera.updateProjectionMatrix();
     frameRoom();
@@ -463,20 +471,36 @@ export function createRoomView(
   let introStart = 0;
   let markReady: () => void = () => undefined;
   const ready = new Promise<void>((resolve) => (markReady = resolve));
-  const outsidePosition = HOME_TARGET.clone().addScaledVector(homeDirection, inside ? 13 : baseDistance);
+  // Écran d'entrée de la vue intérieure : la chambre vue du dehors, cadrée un peu
+  // haut pour laisser la place du titre et du bouton en bas de l'écran.
+  const GATE_TARGET = new THREE.Vector3(0, 0.15, 0);
+  const outsidePosition = new THREE.Vector3();
   const outsideLook = new THREE.PerspectiveCamera(); // sert seulement à calculer une orientation de caméra
   outsideLook.rotation.order = 'YXZ';
-  outsideLook.position.copy(outsidePosition);
-  outsideLook.lookAt(HOME_TARGET);
-  const ENTER_AT = 0.72; // part de l'arrivée après laquelle la caméra entre dans la pièce (vue intérieure)
+  function frameOutside(sway: number) {
+    const aspect = container.clientWidth / container.clientHeight;
+    const half = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    const fitWidth = aspect < 1 ? FIT.widthPortrait : FIT.width;
+    const distance = Math.max((FIT.height * 1.15) / (2 * half), (fitWidth * 1.08) / (2 * half * aspect));
+    outsidePosition.copy(homeDirection).applyAxisAngle(THREE.Object3D.DEFAULT_UP, sway).multiplyScalar(distance).add(GATE_TARGET);
+    outsideLook.position.copy(outsidePosition);
+    outsideLook.lookAt(GATE_TARGET);
+  }
+  frameOutside(0);
+  const ENTER_DURATION = 1700; // durée de la plongée dans la pièce, en millisecondes
+  let entering = false; // vue intérieure : le visiteur a demandé à entrer
+  let enterStart = 0;
 
   function placeInside() {
     camera.position.copy(look.eye);
     [yaw, pitch] = aimedAngles();
     camera.rotation.set(pitch, yaw, 0);
+    camera.fov = container.clientWidth < container.clientHeight ? insideView.fovPortrait : insideView.fov;
+    camera.updateProjectionMatrix();
   }
   function endIntro() {
     intro = false;
+    arrived = true;
     stage.position.y = 0;
     stage.rotation.y = 0;
     setBrightness(1);
@@ -488,38 +512,51 @@ export function createRoomView(
   }
   function playIntro(now: number) {
     introStart ||= now;
-    const duration = ambiance.introDuration * (inside ? 1.45 : 1) * 1000;
-    const t = clamp01((now - introStart) / duration);
-    const settle = inside ? t / ENTER_AT : t; // la descente occupe toute l'arrivée, ou seulement son début
+    // 1. La chambre descend en tournant et s'allume (rien à attendre si les animations sont réduites).
+    const settle = reducedMotion || !ambiance.intro ? 1 : clamp01((now - introStart) / (ambiance.introDuration * 1000));
     const drop = easeOutCubic(clamp01(settle / 0.75));
     stage.position.y = (1 - drop) * INTRO_HEIGHT;
     stage.rotation.y = (1 - drop) * -Math.PI * 1.5;
-    // La lumière monte sur la fin de la descente.
     setBrightness(INTRO_DARK + (1 - INTRO_DARK) * easeOutCubic(clamp01((settle - 0.35) / 0.65)));
-    if (inside) {
-      // Puis la caméra plonge du dehors jusqu'à la place du visiteur.
-      const enter = easeInOut(clamp01((t - ENTER_AT) / (1 - ENTER_AT)));
-      if (ceilingLamp) ceilingLamp.visible = enter > 0.6;
-      const [aimYaw, aimPitch] = aimedAngles();
-      camera.position.lerpVectors(outsidePosition, look.eye, enter);
-      yaw = outsideLook.rotation.y + shortestTurn(outsideLook.rotation.y, aimYaw) * enter;
-      pitch = outsideLook.rotation.x + (aimPitch - outsideLook.rotation.x) * enter;
-      camera.rotation.set(pitch, yaw, 0);
-      camera.fov = FOV + ((container.clientWidth < container.clientHeight ? insideView.fovPortrait : insideView.fov) - FOV) * enter;
-      camera.updateProjectionMatrix();
+    if (!inside) {
+      if (settle >= 1) endIntro();
+      return;
     }
-    if (t >= 1) endIntro();
-  }
-  if (inside) {
+    // 2. Vue intérieure : la caméra reste dehors, en léger balancement, jusqu'à ce que le visiteur entre…
+    frameOutside(reducedMotion ? 0 : Math.sin(now * 0.0004) * 0.06);
     camera.position.copy(outsidePosition);
     camera.rotation.copy(outsideLook.rotation);
+    if (!entering || settle < 1) return;
+    // 3. … puis elle plonge jusqu'à sa place dans la pièce.
+    enterStart ||= now;
+    const enter = reducedMotion ? 1 : easeInOut(clamp01((now - enterStart) / ENTER_DURATION));
+    const [aimYaw, aimPitch] = aimedAngles();
+    camera.position.lerp(look.eye, enter);
+    yaw = outsideLook.rotation.y + shortestTurn(outsideLook.rotation.y, aimYaw) * enter;
+    pitch = outsideLook.rotation.x + (aimPitch - outsideLook.rotation.x) * enter;
+    camera.rotation.set(pitch, yaw, 0);
+    camera.fov = FOV + ((container.clientWidth < container.clientHeight ? insideView.fovPortrait : insideView.fov) - FOV) * enter;
+    camera.updateProjectionMatrix();
+    if (ceilingLamp) ceilingLamp.visible = enter > 0.6;
+    if (enter >= 1) endIntro();
+  }
+  if (inside) {
+    // La vue intérieure commence toujours dehors, devant l'écran d'entrée.
+    intro = true;
+    camera.fov = FOV;
+    camera.updateProjectionMatrix();
+    camera.position.copy(outsidePosition);
+    camera.rotation.copy(outsideLook.rotation);
+    if (ceilingLamp) ceilingLamp.visible = false;
   } else {
     camera.position.copy(HOME_TARGET).addScaledVector(homeDirection, baseDistance * (intro ? 1.5 : 1));
   }
   if (intro) {
     if (controls) controls.enabled = false;
-    stage.position.y = INTRO_HEIGHT;
-    setBrightness(INTRO_DARK);
+    if (!reducedMotion && ambiance.intro) {
+      stage.position.y = INTRO_HEIGHT;
+      setBrightness(INTRO_DARK);
+    }
   } else {
     endIntro();
   }
@@ -607,6 +644,9 @@ export function createRoomView(
 
   return {
     ready,
+    enter() {
+      entering = true;
+    },
     setInset(right, bottom) {
       if (inset.right === right && inset.bottom === bottom) return;
       inset.right = right;

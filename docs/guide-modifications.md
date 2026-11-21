@@ -280,8 +280,20 @@ quand Stevens livrera la pièce fermée, il suffira de ne plus appeler
 | L'affiche encadrée du mur du bureau | `paintFrame` |
 | Plafond et plafonnier | fin de `createEnclosure` |
 
-L'arrivée dans cette vue : la chambre descend comme sur la page d'accueil,
-puis la caméra y entre (`playIntro`, constante `ENTER_AT`).
+**Écran d'entrée.** En arrivant sur cette page, la chambre est vue du dehors,
+avec le titre et un bouton « Entrer dans la chambre ». On entre par ce bouton,
+en faisant défiler vers le bas, ou en glissant le doigt vers le haut ; la
+caméra plonge alors dans la pièce. Ouvrir un objet par le menu ou par un lien
+direct (`dedans.html#cd-stack`) fait entrer aussi, et `dedans.html#entrer`
+entre sans attendre (c'est le lien du bouton de la vue d'ensemble).
+
+| Élément | Où |
+| --- | --- |
+| Textes et bouton de l'écran d'entrée | `gate` dans `frontend/src/main.ts` |
+| Ce qui fait entrer (bouton, molette, doigt) | `enterRoom` et la section « Événements » de `main.ts` |
+| Son apparence | `.gate` dans `frontend/src/style.css` |
+| Cadrage de la chambre à l'écran d'entrée | `frameOutside` et `GATE_TARGET` dans `view.ts` |
+| Durée de la plongée dans la pièce | `ENTER_DURATION` dans `view.ts` |
 
 Il n'y a **aucune lumière** dans la scène : les ombres et les lumières sont
 peintes dans les textures (section 7). Pour changer l'éclairage, il faut
@@ -371,13 +383,44 @@ mire de test, pratique pour vérifier l'orientation.
 
 ### Le bonhomme
 
-Il n'y a pas de fichier 3D : il est construit en formes lisses dans
-`frontend/src/character.ts`, à taille adulte, d'après une photo de référence
-(cheveux bouclés, lunettes rondes, casquette à quartiers, t-shirt jaune, short
-rouge, chaussettes roses, sabots blancs). La planche `Ressources/imageh.png`
-est une première piste de personnage, gardée pour mémoire.
+Son modèle est `frontend/src/assets/character.glb`. Il n'est pas dessiné à la
+main : il est **fabriqué par un script Blender**, `tools/build-character.py`,
+qui décrit tout le personnage (corps d'un seul tenant, t-shirt, short,
+chaussettes, sabots, tête, lunettes, cheveux bouclés, casquette, squelette).
+Pour changer son apparence, on modifie ce script et on le relance :
 
-Réglages courants : `frontend/src/config.ts`, objet `character`.
+```sh
+/Applications/Blender.app/Contents/MacOS/Blender -b --python tools/build-character.py -- \
+    frontend/src/assets/character.glb /tmp/apercu
+```
+
+Le dernier argument est facultatif : un dossier où le script dépose quatre
+images de contrôle (face, profil, dos, visage), à regarder avant de valider.
+Il faut Blender 5 (`brew install --cask blender`) ; le calcul prend une à deux
+minutes.
+
+| Pour changer… | Dans `tools/build-character.py` |
+| --- | --- |
+| Les couleurs (peau, cheveux, t-shirt, short, chaussettes, casquette…) | Les lignes `material(...)`, en haut |
+| La corpulence, la longueur des bras et des jambes | `body_points` : une ligne par articulation, avec sa position et son épaisseur |
+| Le t-shirt, le short, les chaussettes | `shirt_points`, `shorts_points`, `sock` |
+| Le mot sur le t-shirt | `text.data.body` |
+| La taille de la tête | `R` ; tout le visage suit |
+| Yeux, sourcils, nez, sourire, lunettes | Section « Tête », positions données en « rayons de tête » (`on_head`) |
+| Les cheveux (volume, nombre de boucles) | Section « Cheveux bouclés » |
+| La casquette (couleurs des quartiers, visière) | Section « Casquette » |
+| Les chaussures | `shoe` |
+
+Deux choses à savoir si on touche au script :
+
+- La peau cachée sous les vêtements est retirée, pour qu'elle ne traverse
+  jamais le tissu. Si on rallonge ou raccourcit un vêtement, ajuster les
+  hauteurs de la ligne « On retire la peau cachée ».
+- Les os portent des noms que le site utilise (`thigh.L`, `shin.L`, `foot.L`,
+  `upper_arm.L`, `forearm.L`, `spine`, `chest`, `head`, et leurs `.R`). Les
+  renommer demande de reporter le changement dans `frontend/src/character.ts`.
+
+Réglages courants, sans Blender : `frontend/src/config.ts`, objet `character`.
 
 | Réglage | Effet |
 | --- | --- |
@@ -397,26 +440,18 @@ Si un meuble est ajouté sur le tapis, réduire `walkArea` pour l'exclure. Les
 tests refusent une zone de marche qui ferait s'arrêter le bonhomme à
 l'intérieur d'un objet cliquable.
 
-Pour changer son apparence, dans `character.ts` :
-
-| Élément | Où |
-| --- | --- |
-| Couleurs (peau, cheveux, casquette, t-shirt, short, chaussettes…) | `COLORS`, en haut du fichier |
-| Visage, motif du t-shirt | `drawFace`, `drawShirtPrint` (dessinés au trait, comme sur un calque) |
-| Formes du corps, lunettes, cheveux, casquette | `createCharacter`, une ligne `mesh(...)` par forme, rangées par partie du corps |
-| Démarche (balancement des jambes et des bras, genoux, rebond) | fin de `update` |
-
-Si on change les proportions du corps, mettre à jour `MODEL_HEIGHT` (hauteur
-du modèle tel qu'il est construit) : c'est lui qui permet à `height` de rester
-une vraie taille en mètres.
+Sa démarche est animée par le code, pas enregistrée dans le modèle :
+`frontend/src/character.ts`, fin de la fonction `update` (balancement des
+jambes et des bras, pliure des genoux et des coudes, rebond, respiration à
+l'arrêt). Chaque articulation se règle par un angle : négatif vers l'avant,
+positif vers l'arrière.
 
 Le bonhomme est le seul objet éclairé par de vraies lumières (ajoutées dans
-`view.ts`, à côté de `createCharacter`) : la chambre, elle, a ses lumières
-peintes dans sa texture.
+`view.ts`) : la chambre, elle, a ses lumières peintes dans sa texture. Ses
+ombres douces (sous la visière, entre les boucles) sont calculées par Blender
+et enregistrées dans le modèle.
 
-Pour le remplacer un jour par un vrai modèle animé fait dans Blender : charger
-le `.glb` dans `createCharacter` à la place des formes, et garder les deux
-fonctions `walkTo` et `update` ; le reste du site n'a pas à changer.
+S'il ne se charge pas (fichier manquant), la chambre s'affiche sans lui.
 
 ### Poids
 

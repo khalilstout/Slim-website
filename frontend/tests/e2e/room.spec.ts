@@ -100,6 +100,8 @@ test.describe('chambre 3D', () => {
   });
 
   test('le bonhomme marche vers l’objet ouvert, sans erreur', async ({ page, browserName }) => {
+    // Le clavier ouvre une vidéo : on ne charge pas le vrai YouTube, dont les messages ne sont pas les nôtres.
+    await page.route('https://www.youtube-nocookie.com/**', (route) => route.fulfill({ body: 'vidéo' }));
     const errors = await open(page);
     if (!(await expect3D(page, browserName))) return;
     // On enchaîne plusieurs destinations : rien ne doit casser pendant qu'il marche.

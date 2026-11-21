@@ -9,3 +9,4 @@ frontend/tests
 frontend/coverage
 frontend/playwright-report
 frontend/test-results
+tools

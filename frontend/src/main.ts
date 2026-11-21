@@ -4,7 +4,8 @@
 // playlist, chaque article est une petite carte, le panier est la sélection.
 
 import './style.css';
-import { interactables, type Interactable } from './config';
+import { loadCharacterModel } from './character';
+import { character as characterSettings, interactables, type Interactable } from './config';
 import { loadRoom } from './room';
 import { createShop, type Cart, type CartItem, type Category, type Product } from './shop';
 import { createRoomView, type RoomView, type ViewMode } from './view';
@@ -108,13 +109,24 @@ const mode: ViewMode =
 function otherViewUrl(): string {
   const staticDemo = shop.demo && !import.meta.env.DEV;
   if (mode === 'inside') return staticDemo ? './' : location.pathname;
-  return staticDemo ? 'dedans.html' : `${location.pathname}?vue=dedans`;
+  // « #entrer » : venant de la vue d'ensemble, on entre directement, sans repasser par l'écran d'entrée.
+  return (staticDemo ? 'dedans.html' : `${location.pathname}?vue=dedans`) + '#entrer';
 }
 if (mode === 'inside') app.classList.add('view-inside');
 const viewSwitch = h(
   'a',
   { class: 'view-switch', href: otherViewUrl() },
   mode === 'inside' ? 'Vue d’ensemble' : 'Entrer dans la chambre',
+);
+// Écran d'entrée de la vue intérieure : la chambre attend dehors, un bouton (ou un
+// défilement vers le bas) fait entrer.
+const enterButton = h('button', { class: 'pill primary' }, 'Entrer dans la chambre');
+const gate = h(
+  'div',
+  { class: 'gate', hidden: mode !== 'inside' },
+  h('p', { class: 'gate-title' }, 'SLIM'),
+  enterButton,
+  h('p', { class: 'gate-scroll' }, 'ou fais défiler', h('span', { ariaHidden: 'true' }, '↓')),
 );
 const hint = h(
   'p',
@@ -132,7 +144,7 @@ const toast = h('div', { class: 'toast', role: 'status' });
 
 app.append(
   h('header', { class: 'topbar' }, brand, h('nav', { ariaLabel: 'Navigation' }, navHome, navNews, navMerch), cartButton),
-  h('main', { class: 'stage' }, viewEl, labelsEl, hint, viewSwitch),
+  h('main', { class: 'stage' }, viewEl, labelsEl, hint, viewSwitch, gate),
   panel,
   toast,
   loader,
@@ -339,9 +351,17 @@ function paragraphs(text: string): HTMLElement[] {
   return text.split('\n\n').map((part) => h('p', {}, part));
 }
 
+/** Vue intérieure : quitte l'écran d'entrée et fait plonger la caméra dans la pièce. */
+function enterRoom() {
+  if (gate.hidden) return;
+  gate.hidden = true;
+  view?.enter();
+}
+
 function select(id: string) {
   const item = interactables.find((i) => i.id === id);
   if (!item) return;
+  enterRoom(); // ouvrir un objet depuis le menu fait aussi entrer
   view?.focus(id);
   const action = item.action;
   // Un objet avec bulle est une rubrique ; sans bulle, c'est un secret à trouver.
@@ -440,6 +460,7 @@ function renderCart(cart: Cart) {
 }
 
 async function showCart() {
+  enterRoom();
   view?.focus(null);
   setSection('cart');
   toast.classList.remove('visible');
@@ -464,6 +485,16 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !panel.hidden) closePanel();
 });
 
+// Entrer : le bouton, la molette ou le pavé tactile vers le bas, un glissement du doigt vers le haut, ou Entrée.
+enterButton.addEventListener('click', enterRoom);
+window.addEventListener('wheel', (event) => event.deltaY > 8 && enterRoom(), { passive: true });
+let touchStartY: number | null = null;
+gate.addEventListener('touchstart', (event) => (touchStartY = event.touches[0].clientY), { passive: true });
+gate.addEventListener(
+  'touchmove',
+  (event) => touchStartY !== null && touchStartY - event.touches[0].clientY > 40 && enterRoom(),
+  { passive: true },
+);
 window.addEventListener('hashchange', () => openLinked());
 window.addEventListener('resize', syncInset);
 
@@ -479,14 +510,24 @@ function openLinked() {
   } catch {
     return; // adresse mal formée : on reste sur la chambre
   }
-  if (linked === 'panier') void showCart();
+  if (linked === 'entrer') enterRoom();
+  else if (linked === 'panier') void showCart();
   else if (linked) select(linked);
 }
 
-loadRoom()
-  .then((room) => {
-    view = createRoomView(viewEl, labelsEl, room, interactables, select, mode);
+// Le bonhomme est un plus : s'il ne se charge pas, la chambre s'affiche sans lui.
+const characterModel = characterSettings.enabled
+  ? loadCharacterModel().catch((error) => {
+      console.warn('[character] modèle non chargé', error);
+      return null;
+    })
+  : Promise.resolve(null);
+
+Promise.all([loadRoom(), characterModel])
+  .then(([room, bonhomme]) => {
+    view = createRoomView(viewEl, labelsEl, room, interactables, select, mode, bonhomme);
     syncInset();
+    if (gate.hidden) view.enter(); // « entrer » a été demandé avant la fin du chargement
     // L'indication n'apparaît qu'une fois l'animation d'arrivée terminée.
     void view.ready.then(() => (hint.hidden = !panel.hidden));
   })

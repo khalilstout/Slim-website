@@ -3,7 +3,8 @@
 // on vérifie ici ce qui est propre à cette vue.
 import { expect, test, type Page } from '@playwright/test';
 
-async function open(page: Page, path = './dedans.html'): Promise<string[]> {
+/** Ouvre la page ; `enter` = franchir l'écran d'entrée avec son bouton, s'il est affiché. */
+async function open(page: Page, path = './dedans.html', enter = true): Promise<string[]> {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -12,6 +13,8 @@ async function open(page: Page, path = './dedans.html'): Promise<string[]> {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(path);
   await expect(page.locator('.loader')).toHaveClass(/done/, { timeout: 30_000 });
+  const button = page.getByRole('button', { name: 'Entrer dans la chambre' });
+  if (enter && (await button.isVisible())) await button.click();
   return errors;
 }
 
@@ -28,12 +31,50 @@ test('les deux versions renvoient l’une vers l’autre', async ({ page }) => {
   await open(page, './');
   await expect(page.locator('#app')).not.toHaveAttribute('data-view', 'inside');
   await page.getByRole('link', { name: 'Entrer dans la chambre' }).click();
-  await expect(page).toHaveURL(/dedans\.html$/);
+  // Venant de la vue d'ensemble, on entre directement : pas d'écran d'entrée à refranchir.
+  await expect(page).toHaveURL(/dedans\.html#entrer$/);
   await expect(page.locator('#app')).toHaveAttribute('data-view', 'inside');
   await expect(page.locator('.loader')).toHaveClass(/done/, { timeout: 30_000 });
+  await expect(page.locator('.gate')).toBeHidden();
   await page.getByRole('link', { name: 'Vue d’ensemble' }).click();
   await expect(page).not.toHaveURL(/dedans/);
   await expect(page.getByRole('link', { name: 'Entrer dans la chambre' })).toBeVisible();
+});
+
+test.describe('écran d’entrée', () => {
+  const gate = (page: Page) => page.locator('.gate');
+
+  test('attend le visiteur, puis le bouton fait entrer', async ({ page }) => {
+    await open(page, './dedans.html', false);
+    await expect(gate(page)).toBeVisible();
+    // Tant qu'on n'est pas entré, rien ne s'affiche par-dessus la chambre.
+    await expect(page.locator('.hint')).toBeHidden();
+    await expect(page.locator('.view-switch')).toBeHidden();
+    await page.getByRole('button', { name: 'Entrer dans la chambre' }).click();
+    await expect(gate(page)).toBeHidden();
+    await expect(page.locator('.view-switch')).toBeVisible();
+  });
+
+  test('faire défiler vers le bas fait entrer', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'la molette ne concerne pas le tactile');
+    await open(page, './dedans.html', false);
+    await page.mouse.move(300, 300);
+    await page.mouse.wheel(0, -200); // vers le haut : on reste dehors
+    await expect(gate(page)).toBeVisible();
+    await page.mouse.wheel(0, 200);
+    await expect(gate(page)).toBeHidden();
+  });
+
+  test('un lien direct ou le menu font entrer sans passer par le bouton', async ({ page }) => {
+    await open(page, './dedans.html#posters', false);
+    await expect(gate(page)).toBeHidden();
+    await expect(panel(page).getByRole('heading', { name: 'Posters' })).toBeVisible();
+    await open(page, './dedans.html', false);
+    await expect(gate(page)).toBeVisible();
+    await page.getByRole('navigation').getByRole('button', { name: 'Merch' }).click();
+    await expect(gate(page)).toBeHidden();
+    await expect(panel(page).locator('.track')).toHaveCount(3);
+  });
 });
 
 test('la vue intérieure s’affiche sans erreur', async ({ page, browserName }) => {
