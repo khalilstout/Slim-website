@@ -85,7 +85,7 @@ Trois workflows dans `.github/workflows/`.
 
 | Job | Contenu |
 | --- | --- |
-| Front | Lint, types, tests unitaires avec couverture, build ; sur Node 22 et 24. |
+| Front | Lint, types, tests unitaires avec couverture, build ; sur Node 24 et 26. |
 | Navigateur | Les tests `e2e`, un job par configuration (5 en parallèle). En cas d'échec, captures d'écran et traces sont jointes au run (« Artifacts »). |
 | PHP | Syntaxe du module sur PHP 8.1 à 8.5. |
 | Dockerfile et workflows | `hadolint` (Dockerfile), `actionlint` (workflows), validité de `docker-compose.yml`. |
