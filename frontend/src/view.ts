@@ -2,9 +2,10 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ambiance, type Interactable } from './config';
+import { createCharacter } from './character';
+import { ambiance, character as characterSettings, type Interactable } from './config';
 import type { Room } from './room';
-import { zoneAt, zoneCenter, zoneContains } from './zones';
+import { standPoint, zoneAt, zoneCenter, zoneContains } from './zones';
 
 const FOV = 36;
 const HOME_TARGET = new THREE.Vector3(0, 0.9, 0);
@@ -148,6 +149,16 @@ export function createRoomView(
   scene.add(stage);
   const dust = buildAmbiance(scene);
 
+  // Le bonhomme est le seul objet éclairé de la scène (la chambre a ses lumières peintes).
+  const character = characterSettings.enabled ? createCharacter() : null;
+  if (character) {
+    stage.add(character.object);
+    scene.add(new THREE.HemisphereLight(0xfff3e6, 0xa8684a, 2.1));
+    const windowLight = new THREE.DirectionalLight(0xffd9a8, 1.1);
+    windowLight.position.set(-2, 3, -3); // depuis les fenêtres
+    scene.add(windowLight);
+  }
+
   const roomMaterials = new Set<THREE.MeshBasicMaterial>();
   room.object.traverse((node) => {
     const mesh = node as THREE.Mesh;
@@ -210,6 +221,12 @@ export function createRoomView(
     }
     return { item, glow, glowGoal: 0, center, anchor, label };
   });
+
+  if (debug) {
+    const { min, max } = characterSettings.walkArea;
+    const area = new THREE.Box3(new THREE.Vector3(min[0], 0, min[1]), new THREE.Vector3(max[0], 0.02, max[1]));
+    stage.add(new THREE.Box3Helper(area, 0xff8800));
+  }
 
   let highlighted: Entry | null = null;
   function highlight(entry: Entry | null) {
@@ -343,10 +360,15 @@ export function createRoomView(
 
   const projected = new THREE.Vector3();
   const offset = new THREE.Vector3();
+  let previous = 0;
   function frame(now: number) {
     requestAnimationFrame(frame);
+    // Temps écoulé depuis l'image précédente, borné : un onglet resté en arrière-plan ne fait pas de bond.
+    const dt = Math.min(0.05, (now - (previous || now)) / 1000);
+    previous = now;
     if (intro) playIntro(now);
     room.update(now);
+    character?.update(dt);
     dust.rotation.y = now * 0.00002;
     dust.position.y = Math.sin(now * 0.0003) * 0.35;
     const ease = intro ? 0.03 : 0.08; // la caméra s'approche plus lentement pendant l'arrivée
@@ -410,6 +432,10 @@ export function createRoomView(
       animating = true;
       highlight(focused);
       for (const entry of entries) entry.label?.classList.toggle('active', entry === focused);
+      if (focused && character) {
+        const [x, z] = standPoint(focused.item.zone, characterSettings.walkArea);
+        character.walkTo(x, z, focused.center.x, focused.center.z);
+      }
     },
   };
 }

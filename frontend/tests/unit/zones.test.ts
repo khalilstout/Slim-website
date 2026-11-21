@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { zoneAt, zoneCenter, zoneContains, zoneIsValid, zoneVolume, type Zone } from '../../src/zones';
+import { standPoint, zoneAt, zoneCenter, zoneContains, zoneIsValid, zoneVolume, type Zone } from '../../src/zones';
 
 const box: Zone = { min: [0, 0, 0], max: [2, 1, 4] };
 
@@ -32,6 +32,19 @@ describe('mesures', () => {
     expect(zoneIsValid({ min: [1, 0, 0], max: [0, 1, 1] })).toBe(false);
     expect(zoneIsValid({ min: [0, 0, 0], max: [1, 0, 1] })).toBe(false);
     expect(zoneIsValid({ min: [NaN, 0, 0], max: [1, 1, 1] })).toBe(false);
+  });
+});
+
+describe('standPoint (où le bonhomme se place)', () => {
+  const area = { min: [-1, -1] as [number, number], max: [1, 2] as [number, number] };
+
+  it('reste sur place si l’objet est au-dessus de la zone de marche', () => {
+    expect(standPoint({ min: [0, 0, 0], max: [0.4, 1, 1] }, area)).toEqual([0.2, 0.5]);
+  });
+
+  it('s’arrête au bord le plus proche d’un objet situé hors de la zone', () => {
+    expect(standPoint({ min: [2, 0, 0], max: [3, 2, 1] }, area)).toEqual([1, 0.5]);
+    expect(standPoint({ min: [-3, 0, -4], max: [-2, 1, -3] }, area)).toEqual([-1, -1]);
   });
 });
 

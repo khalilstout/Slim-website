@@ -1,7 +1,7 @@
 // Le contenu de la chambre : objets cliquables, posters affichés, ambiance.
 // C'est le fichier qu'on modifie le plus. Voir docs/guide-modifications.md.
 
-import type { Zone } from './zones';
+import type { FloorArea, Zone } from './zones';
 
 export type Action =
   | { type: 'shop'; category: string } // slug de la catégorie PrestaShop
@@ -93,6 +93,29 @@ export const mainPosters: { crop: [number, number, number, number] }[] = [
   { crop: [0.0, 0.0, 0.238, 0.335] },
   { crop: [0.716, 0.0, 0.952, 0.335] },
 ];
+
+/**
+ * Le petit bonhomme. Quand on ouvre un objet, il marche en ligne droite
+ * jusqu'au point de `walkArea` le plus proche de cet objet, et le regarde.
+ */
+export const character = {
+  /** `false` le retire complètement de la chambre. */
+  enabled: true,
+  /** Taille en mètres, hélice comprise (le bureau fait 0,8 m de haut). */
+  height: 1.05,
+  /** Vitesse de marche, en mètres par seconde. */
+  speed: 1.5,
+  /** Où il attend à l'ouverture de la page : [x, z]. */
+  start: [-0.1, 0.9] as [number, number],
+  /** Vers où il regarde au départ (radians ; -π/4 = vers la caméra). */
+  startFacing: -Math.PI / 4,
+  /**
+   * Rectangle de sol libre de tout meuble (le tapis, en gros). Il ne sort
+   * jamais de ce rectangle : c'est ce qui lui évite de traverser un meuble
+   * sans calcul de chemin. Visible en orange avec `?debug`.
+   */
+  walkArea: { min: [-0.7, -1.5], max: [0.6, 2.2] } as FloorArea,
+};
 
 /** Ambiance et animation d'arrivée de la scène. */
 export const ambiance = {

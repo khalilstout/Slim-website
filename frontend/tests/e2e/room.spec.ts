@@ -99,6 +99,20 @@ test.describe('chambre 3D', () => {
     expect(await size()).toBe(before);
   });
 
+  test('le bonhomme marche vers l’objet ouvert, sans erreur', async ({ page, browserName }) => {
+    const errors = await open(page);
+    if (!(await expect3D(page, browserName))) return;
+    // On enchaîne plusieurs destinations : rien ne doit casser pendant qu'il marche.
+    for (const id of ['posters', 'cd-stack', 'keyboard']) {
+      await page.evaluate((hash) => (location.hash = hash), id);
+      await expect(panel(page)).toBeVisible();
+      await page.waitForTimeout(400);
+    }
+    await page.getByRole('button', { name: /Slim — retour/ }).click();
+    await expect(page.locator('.view canvas')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test('la page ne déborde pas de l’écran', async ({ page }) => {
     await open(page, './#cd-stack');
     await expect(panel(page)).toBeVisible();

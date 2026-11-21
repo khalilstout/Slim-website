@@ -1,8 +1,8 @@
 // Vérifie que config.ts reste cohérent : c'est le fichier que tout le monde modifie.
 import { describe, expect, it } from 'vitest';
-import { ambiance, interactables, mainPosters } from '../../src/config';
+import { ambiance, character, interactables, mainPosters } from '../../src/config';
 import { demoCatalog } from '../../src/shop';
-import { zoneIsValid } from '../../src/zones';
+import { standPoint, zoneContains, zoneIsValid } from '../../src/zones';
 
 // Dimensions de la chambre (mètres), avec un peu de marge.
 const ROOM = { min: [-2.8, -0.2, -2.8], max: [2.8, 3.2, 2.8] };
@@ -43,6 +43,34 @@ describe('objets cliquables', () => {
 
   it('le menu « Actus » a bien sa cible', () => {
     expect(interactables.some((item) => item.id === 'computer')).toBe(true);
+  });
+});
+
+describe('bonhomme', () => {
+  const { walkArea, start } = character;
+
+  it('a une zone de marche à l’endroit, dans la chambre, et y démarre', () => {
+    walkArea.min.forEach((value, axis) => expect(value).toBeLessThan(walkArea.max[axis]));
+    expect(walkArea.min[0]).toBeGreaterThanOrEqual(ROOM.min[0]);
+    expect(walkArea.max[0]).toBeLessThanOrEqual(ROOM.max[0]);
+    expect(walkArea.min[1]).toBeGreaterThanOrEqual(ROOM.min[2]);
+    expect(walkArea.max[1]).toBeLessThanOrEqual(ROOM.max[2]);
+    start.forEach((value, axis) => {
+      expect(value).toBeGreaterThanOrEqual(walkArea.min[axis]);
+      expect(value).toBeLessThanOrEqual(walkArea.max[axis]);
+    });
+  });
+
+  it('a une taille et une vitesse raisonnables', () => {
+    expect(character.height).toBeGreaterThan(0.3);
+    expect(character.height).toBeLessThan(2);
+    expect(character.speed).toBeGreaterThan(0);
+  });
+
+  it.each(interactables)('$id : ne s’arrête pas à l’intérieur de l’objet', ({ zone }) => {
+    // S'il s'arrêtait dans la zone d'un meuble, il le traverserait.
+    const [x, z] = standPoint(zone, walkArea);
+    expect(zoneContains(zone, { x, y: 0.3, z })).toBe(false);
   });
 });
 
