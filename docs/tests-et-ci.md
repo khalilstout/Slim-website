@@ -57,6 +57,10 @@ matrice du job `e2e` de `.github/workflows/ci.yml`.
   dessine vraiment quelque chose, les bulles ouvrent les rayons, le panier
   (ajout, quantité, retrait, rechargement), le menu, Échap, les liens directs,
   les adresses mal formées, la page ne déborde pas de l'écran.
+- `inside.spec.ts` : la vue intérieure (`dedans.html`). Les deux pages renvoient
+  l'une vers l'autre, l'image remplit l'écran (la pièce est bien fermée),
+  glisser fait tourner le regard sans ouvrir de panneau, on peut acheter et le
+  panier est commun aux deux versions.
 - `prestashop.spec.ts` : le mode PrestaShop **sans PrestaShop**. La page reçoit
   la configuration qu'écrirait le module et une fausse API. Sert surtout à
   vérifier qu'un nom de produit piégé (`<img onerror=…>`) s'affiche comme du

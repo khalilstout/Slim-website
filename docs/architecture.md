@@ -32,6 +32,7 @@ Vite + TypeScript + three.js, sans framework d'interface.
 | `src/main.ts` | L'interface : barre du haut, panneau (rayon, texte, vidéo, panier), notification, écran de chargement. |
 | `src/view.ts` | La vue 3D : rendu, caméra, clic et survol des objets, bulles, animation d'arrivée, décor autour de la chambre. |
 | `src/room.ts` | La chambre : charge le modèle Blender et lui applique ses textures. |
+| `src/enclosure.ts` | Vue intérieure : les murs, le plafond et la porte ajoutés pour fermer la pièce. |
 | `src/character.ts` | Le bonhomme : ses formes, sa marche vers l'objet ouvert. |
 | `src/zones.ts` | Les calculs sur les zones cliquables (un point est-il dans une boîte ?). Sans dépendance, donc facile à tester. |
 | `src/shop.ts` | L'accès à la boutique, derrière l'interface `Shop`. |
@@ -50,6 +51,21 @@ ombres et les lumières sont déjà peintes (« baking »). Conséquences :
   sont donc des **zones** (boîtes) décrites dans `config.ts`. Au chargement,
   `view.ts` range dans chaque zone les faces du modèle qui s'y trouvent ; ce
   sont elles qu'on éclaire au survol.
+
+### Deux pages, une seule scène
+
+| Page | Ce qu'on voit |
+| --- | --- |
+| `index.html` | La vue d'ensemble : la chambre de l'extérieur, qu'on fait tourner. |
+| `dedans.html` | La vue intérieure : on est dans la pièce, on regarde autour, un clic fait voler la caméra vers l'objet. |
+
+`dedans.html` n'est pas un second site : c'est une copie d'`index.html`
+produite au build (`vite.config.ts`), où l'élément `#app` porte
+`data-view="inside"`. `main.ts` lit cet attribut (ou `?vue=dedans` dans
+l'adresse, pour le développement et PrestaShop) et le passe à `view.ts`, qui
+choisit sa caméra. Les zones, les panneaux, la boutique et le bonhomme sont
+strictement les mêmes ; la vue intérieure ajoute seulement de quoi fermer la
+pièce (`enclosure.ts`).
 
 ### Un seul build, deux usages
 

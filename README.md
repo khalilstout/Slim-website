@@ -14,7 +14,10 @@ PrestaShop 9.
 | [docs/tests-et-ci.md](docs/tests-et-ci.md) | Les tests, la CI GitHub Actions, les contrôles de sécurité, et quoi faire quand un job est rouge. |
 | [docs/deploiement.md](docs/deploiement.md) | Démo publique GitHub Pages, et ce qu'il reste à faire pour le cloud. |
 
-Démo en ligne (produits fictifs, sans paiement) : https://khalilstout.github.io/Slim-website/
+Démo en ligne (produits fictifs, sans paiement) :
+
+- vue d'ensemble : https://khalilstout.github.io/Slim-website/
+- vue intérieure (prototype) : https://khalilstout.github.io/Slim-website/dedans.html
 
 ## Lancer en local
 
@@ -26,7 +29,7 @@ docker compose up --build
 
 La première fois, PrestaShop s'installe tout seul (quelques minutes). Ensuite :
 
-- boutique : http://localhost:8080
+- boutique : http://localhost:8080 (vue intérieure : http://localhost:8080/?vue=dedans)
 - back-office : http://localhost:8080/admin-dev — identifiants dans `docker-compose.yml`
   (valeurs de développement, à surcharger via `.env`, voir `.env.example`)
 
@@ -48,6 +51,7 @@ Commandes utiles :
 | `frontend/src/assets/` | Le modèle 3D de la chambre et ses textures, prêts pour le web. |
 | `frontend/tests/` | Tests unitaires (`unit/`) et tests navigateur (`e2e/`). |
 | `Ressources/bundle_001/` | Sources Blender et textures d'origine de la chambre. |
+| `tools/` | Scripts ponctuels (agrandissement de la texture de la chambre). |
 | `tests/integration/` | Test d'une vraie boutique PrestaShop en fonctionnement. |
 | `prestashop/modules/slimroom/` | Module PrestaShop : affiche la chambre en page d'accueil et fournit l'API catalogue / panier. |
 | `prestashop/post-install/` | Script lancé une fois après l'installation de PrestaShop (installe le module). |
@@ -63,6 +67,10 @@ Commandes utiles :
 - La chambre est le modèle Blender (`bundle_001`). Il est fusionné en une seule
   pièce : les objets cliquables sont des zones réglées à la main dans
   `config.ts`, à réajuster si un meuble bouge dans une prochaine version.
+- La vue intérieure est un **prototype**. Les deux murs manquants, le plafond et
+  la porte sont dessinés par le code en attendant ceux du modèle, et la texture
+  de la chambre est un agrandissement de celle de 768 pixels : nette, mais sans
+  détail supplémentaire.
 - Le bonhomme est construit en formes simples dans le code, d'après une photo
   de référence : ce n'est pas un modèle sculpté par un graphiste. Un vrai
   modèle animé pourra le remplacer sans toucher au reste (voir le guide).

@@ -14,9 +14,25 @@ const cacheBust = {
   transformIndexHtml: (html: string) => html.replace(/(assets\/room\.(?:js|css))"/g, `$1?v=${version}"`),
 };
 
+// Seconde page de la démo : dedans.html, la même page avec la vue intérieure.
+// C'est une copie d'index.html où #app porte data-view="inside" (lu par main.ts).
+const insidePage = {
+  name: 'inside-page',
+  enforce: 'post' as const,
+  generateBundle(_options: unknown, bundle: Record<string, { type: string; source?: string | Uint8Array }>) {
+    const index = bundle['index.html'];
+    if (index?.type !== 'asset' || typeof index.source !== 'string') return;
+    (this as unknown as { emitFile(file: { type: 'asset'; fileName: string; source: string }): void }).emitFile({
+      type: 'asset',
+      fileName: 'dedans.html',
+      source: index.source.replace('<div id="app"', '<div id="app" data-view="inside"'),
+    });
+  },
+};
+
 export default defineConfig({
   base: './',
-  plugins: [cacheBust],
+  plugins: [cacheBust, insidePage],
   build: {
     rollupOptions: {
       output: {

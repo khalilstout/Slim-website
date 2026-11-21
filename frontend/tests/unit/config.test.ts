@@ -1,6 +1,6 @@
 // Vérifie que config.ts reste cohérent : c'est le fichier que tout le monde modifie.
 import { describe, expect, it } from 'vitest';
-import { ambiance, character, interactables, mainPosters } from '../../src/config';
+import { ambiance, character, insideView, interactables, mainPosters } from '../../src/config';
 import { demoCatalog } from '../../src/shop';
 import { standPoint, zoneContains, zoneIsValid } from '../../src/zones';
 
@@ -71,6 +71,43 @@ describe('bonhomme', () => {
     // S'il s'arrêtait dans la zone d'un meuble, il le traverserait.
     const [x, z] = standPoint(zone, walkArea);
     expect(zoneContains(zone, { x, y: 0.3, z })).toBe(false);
+  });
+});
+
+describe('vue intérieure', () => {
+  const inRoom = ([x, y, z]: [number, number, number]) => {
+    expect(Math.abs(x)).toBeLessThan(2.5);
+    expect(Math.abs(z)).toBeLessThan(2.5);
+    expect(y).toBeGreaterThan(0.5);
+    expect(y).toBeLessThan(2.5);
+  };
+
+  it('place le visiteur dans la pièce, à hauteur d’yeux', () => {
+    inRoom(insideView.eye);
+    expect(insideView.eye[1]).toBeGreaterThan(1.2);
+    expect(insideView.eye[1]).toBeLessThan(1.9);
+    expect(insideView.lookAt).not.toEqual(insideView.eye);
+  });
+
+  it('a des angles raisonnables', () => {
+    for (const fov of [insideView.fov, insideView.fovPortrait]) {
+      expect(fov).toBeGreaterThanOrEqual(40);
+      expect(fov).toBeLessThanOrEqual(95);
+    }
+    expect(insideView.maxTurn).toBeGreaterThan(0);
+    expect(insideView.maxTurn).toBeLessThanOrEqual(Math.PI);
+    expect(insideView.maxTilt).toBeLessThan(Math.PI / 2);
+  });
+
+  it('fait attendre le bonhomme dans sa zone de marche', () => {
+    insideView.characterStart.forEach((value, axis) => {
+      expect(value).toBeGreaterThanOrEqual(character.walkArea.min[axis]);
+      expect(value).toBeLessThanOrEqual(character.walkArea.max[axis]);
+    });
+  });
+
+  it('les points de vue imposés sont dans la pièce', () => {
+    for (const item of interactables) if (item.viewFrom) inRoom(item.viewFrom);
   });
 });
 

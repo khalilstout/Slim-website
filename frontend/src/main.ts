@@ -7,7 +7,7 @@ import './style.css';
 import { interactables, type Interactable } from './config';
 import { loadRoom } from './room';
 import { createShop, type Cart, type CartItem, type Category, type Product } from './shop';
-import { createRoomView, type RoomView } from './view';
+import { createRoomView, type RoomView, type ViewMode } from './view';
 
 type Child = Node | string | null | false;
 
@@ -99,7 +99,28 @@ const cartButton = h(
 
 const viewEl = h('div', { class: 'view' });
 const labelsEl = h('div', { class: 'labels' });
-const hint = h('p', { class: 'hint', hidden: true }, 'Clique sur les objets de la chambre');
+// Deux pages pour deux façons de voir la chambre : l'accueil (vue d'ensemble) et
+// dedans.html (vue intérieure). La page l'indique par l'attribut data-view de
+// #app ; en développement et dans PrestaShop, ?vue=dedans fait la même chose.
+const mode: ViewMode =
+  app.dataset.view === 'inside' || new URLSearchParams(location.search).get('vue') === 'dedans' ? 'inside' : 'outside';
+/** Adresse de l'autre version. La démo compilée a deux fichiers ; ailleurs, c'est un paramètre d'adresse. */
+function otherViewUrl(): string {
+  const staticDemo = shop.demo && !import.meta.env.DEV;
+  if (mode === 'inside') return staticDemo ? './' : location.pathname;
+  return staticDemo ? 'dedans.html' : `${location.pathname}?vue=dedans`;
+}
+if (mode === 'inside') app.classList.add('view-inside');
+const viewSwitch = h(
+  'a',
+  { class: 'view-switch', href: otherViewUrl() },
+  mode === 'inside' ? 'Vue d’ensemble' : 'Entrer dans la chambre',
+);
+const hint = h(
+  'p',
+  { class: 'hint', hidden: true },
+  mode === 'inside' ? 'Clique sur un objet · glisse pour regarder autour' : 'Clique sur les objets de la chambre',
+);
 const loader = h(
   'div',
   { class: 'loader' },
@@ -111,7 +132,7 @@ const toast = h('div', { class: 'toast', role: 'status' });
 
 app.append(
   h('header', { class: 'topbar' }, brand, h('nav', { ariaLabel: 'Navigation' }, navHome, navNews, navMerch), cartButton),
-  h('main', { class: 'stage' }, viewEl, labelsEl, hint),
+  h('main', { class: 'stage' }, viewEl, labelsEl, hint, viewSwitch),
   panel,
   toast,
   loader,
@@ -464,7 +485,7 @@ function openLinked() {
 
 loadRoom()
   .then((room) => {
-    view = createRoomView(viewEl, labelsEl, room, interactables, select);
+    view = createRoomView(viewEl, labelsEl, room, interactables, select, mode);
     syncInset();
     // L'indication n'apparaît qu'une fois l'animation d'arrivée terminée.
     void view.ready.then(() => (hint.hidden = !panel.hidden));

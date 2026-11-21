@@ -45,7 +45,7 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
       - name: Le build produit les fichiers attendus par le module PrestaShop
-        run: test -s dist/index.html && test -s dist/assets/room.js && test -s dist/assets/room.css
+        run: test -s dist/index.html && test -s dist/dedans.html && test -s dist/assets/room.js && test -s dist/assets/room.css
 
   e2e:
     name: Navigateur · ${{ matrix.project }}

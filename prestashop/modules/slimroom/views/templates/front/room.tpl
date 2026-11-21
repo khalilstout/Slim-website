@@ -10,7 +10,7 @@
   <body>
     {* La configuration passe par un attribut, pas par un <script> en ligne :
        la politique de sécurité de la page peut ainsi interdire tout script en ligne. *}
-    <div id="app" data-slimroom="{$slimroom_config|escape:'html':'UTF-8'}"></div>
+    <div id="app" data-view="{$slimroom_view|escape:'html':'UTF-8'}" data-slimroom="{$slimroom_config|escape:'html':'UTF-8'}"></div>
     <script type="module" src="{$slimroom_assets|escape:'html':'UTF-8'}room.js?v={$slimroom_version|escape:'url'}"></script>
   </body>
 </html>

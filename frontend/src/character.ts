@@ -140,7 +140,7 @@ function shortestTurn(from: number, to: number): number {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
-export function createCharacter(): Character {
+export function createCharacter(start: [number, number] = settings.start, facing = settings.startFacing): Character {
   // Le personnage regarde vers +z ; l'origine est entre ses pieds, au sol. Mesures en mètres.
   const root = new THREE.Group();
   root.name = 'character';
@@ -247,12 +247,12 @@ export function createCharacter(): Character {
   brim.scale.z = 1.25;
 
   root.scale.setScalar(settings.height / MODEL_HEIGHT);
-  root.position.set(settings.start[0], 0, settings.start[1]);
-  root.rotation.y = settings.startFacing;
+  root.position.set(start[0], 0, start[1]);
+  root.rotation.y = facing;
 
   // ----- Déplacement -----
-  const target = new THREE.Vector2(settings.start[0], settings.start[1]);
-  let finalFacing = settings.startFacing;
+  const target = new THREE.Vector2(start[0], start[1]);
+  let finalFacing = facing;
   let stride = 0; // avancement du cycle de marche (un pas = π)
   let moving = 0; // 0 = à l'arrêt, 1 = en pleine marche (fondu entre les deux)
   let time = 0;

@@ -313,6 +313,33 @@ a:focus-visible,
   pointer-events: none;
 }
 
+/* Lien vers l'autre version de la page (vue d'ensemble / vue intérieure). */
+.view-switch {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+  transition: background 0.2s, color 0.2s;
+}
+
+.view-switch:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
 /* ----- Panneau : une « playlist » ----- */
 .panel {
   position: fixed;
@@ -851,6 +878,20 @@ a:focus-visible,
 
   .panel-head h2 {
     font-size: 24px;
+  }
+
+  /* En vue intérieure la pièce remplit tout l'écran, y compris derrière la barre. */
+  .view-inside .stage {
+    top: 0;
+  }
+
+  /* Le lien de changement de vue remonte au-dessus de l'indication, et s'efface sous le volet. */
+  .view-switch {
+    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 64px);
+  }
+
+  .panel-open .view-switch {
+    display: none;
   }
 
   /* La notification passe au-dessus du volet. */

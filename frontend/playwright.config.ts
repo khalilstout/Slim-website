@@ -32,7 +32,7 @@ export default defineConfig({
     { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
   ],
   webServer: {
-    command: `npm run preview -- --port ${PORT} --strictPort`,
+    command: `node tests/e2e/serve.mjs dist ${PORT}`,
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env.CI,
   },

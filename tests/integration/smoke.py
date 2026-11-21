@@ -87,6 +87,14 @@ for kind, pattern in (("JavaScript", r'src="([^"]+room\.js[^"]*)"'), ("CSS", r'h
     asset_status, _, content = request(urllib.parse.urljoin(BASE + "/", html.unescape(asset.group(1))))
     check(asset_status == 200 and len(content) > 1000, f"le {kind} du front est servi")
 
+# ----- Seconde version de la page : la vue intérieure -----
+check('data-view="outside"' in page, "la page d'accueil est la vue d'ensemble")
+status, _, inside_page = request(BASE + "/?vue=dedans")
+check(status == 200 and 'data-view="inside"' in inside_page, "?vue=dedans donne la vue intérieure")
+status, _, other_page = request(BASE + "/?vue=%22%3E%3Cscript%3E")
+check(status == 200 and 'data-view="outside"' in other_page and "<script>" not in other_page,
+      "une valeur inconnue de ?vue retombe sur la vue d'ensemble, sans être recopiée dans la page")
+
 # ----- API -----
 status, headers, body = request(config["apiUrl"])
 check(status == 200 and "application/json" in headers.get("Content-Type", ""), "l'API répond en JSON")

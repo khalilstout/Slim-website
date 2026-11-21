@@ -24,6 +24,7 @@ unitaires). Voir [tests-et-ci.md](tests-et-ci.md).
 4. [Couleurs, fond et mise en page](#4-couleurs-fond-et-mise-en-page)
 5. [Animation d'arrivée et ambiance](#5-animation-darrivée-et-ambiance)
 6. [Caméra et surbrillance](#6-caméra-et-surbrillance)
+   (et [la vue intérieure](#la-vue-intérieure))
 7. [La chambre : modèle Blender et textures](#7-la-chambre--modèle-blender-et-textures)
 8. [Nouveau type de panneau](#8-nouveau-type-de-panneau)
    (et [le bonhomme](#le-bonhomme), en fin de section 7)
@@ -230,6 +231,57 @@ Fichier : `frontend/src/view.ts`, constantes en haut du fichier.
 | `controls.min…` / `controls.max…` | Jusqu'où l'utilisateur peut tourner et zoomer. |
 | Glissement de la chambre quand le panneau s'ouvre | Dans `frame()`, le `0.12` de « La vue glisse… » (plus grand = plus rapide). La place du panneau est mesurée par `syncInset` dans `main.ts`. |
 
+### La vue intérieure
+
+Le site existe en deux versions, sur deux pages qui renvoient l'une vers
+l'autre (bouton en bas à gauche) :
+
+| Version | Démo | En développement et dans PrestaShop |
+| --- | --- | --- |
+| Vue d'ensemble : la chambre vue du dehors, qu'on fait tourner | `index.html` | adresse normale |
+| Vue intérieure : on est dans la pièce, à hauteur d'yeux | `dedans.html` | `?vue=dedans` à la fin de l'adresse |
+
+Tout le reste est commun : objets cliquables, panneaux, panier, bonhomme.
+C'est le même code ; seule la caméra change (`mode` dans `view.ts`).
+
+Dans la vue intérieure : on regarde autour en glissant (souris ou doigt) ou en
+amenant la souris contre un bord de l'écran ; un clic sur un objet y fait
+voler la caméra ; fermer le panneau ramène à la place de départ.
+
+Réglages : `frontend/src/config.ts`, objet `insideView`.
+
+| Réglage | Effet |
+| --- | --- |
+| `eye` | Où se tient le visiteur en arrivant, `[x, y, z]`. |
+| `lookAt` | Le point qu'il regarde en arrivant. |
+| `characterStart` | Où le bonhomme attend dans cette vue. |
+| `fov`, `fovPortrait` | Angle de champ sur écran large et sur téléphone tenu droit. |
+| `maxTurn`, `maxTilt` | Jusqu'où on peut tourner la tête et lever ou baisser les yeux. |
+| `edgeSpeed` | Vitesse du regard quand la souris touche un bord. |
+
+D'où la caméra regarde un objet : elle se place toute seule à côté, de biais
+par rapport au bonhomme pour qu'il ne bouche pas la vue (`insideViewpoint`
+dans `view.ts`). Si le cadrage d'un objet ne convient pas, on l'impose dans
+`config.ts` en ajoutant `viewFrom: [x, y, z]` à cet objet.
+
+**Murs, plafond et porte.** Le modèle Blender n'a que deux murs et pas de
+plafond. Pour cette vue, `frontend/src/enclosure.ts` ajoute les deux murs
+manquants, un plafond, un plafonnier et une porte, dessinés par le code ; leurs
+teintes sont relevées sur la texture de la chambre. C'est un décor provisoire :
+quand Stevens livrera la pièce fermée, il suffira de ne plus appeler
+`createEnclosure` dans `view.ts`. Pour changer ce décor en attendant :
+
+| Élément | Où, dans `enclosure.ts` |
+| --- | --- |
+| Dimensions de la pièce | `ROOM`, en haut |
+| Teinte et ombres des murs, plinthe | `paintWall` |
+| La porte et son écriteau | `paintDoor` |
+| L'affiche encadrée du mur du bureau | `paintFrame` |
+| Plafond et plafonnier | fin de `createEnclosure` |
+
+L'arrivée dans cette vue : la chambre descend comme sur la page d'accueil,
+puis la caméra y entre (`playIntro`, constante `ENTER_AT`).
+
 Il n'y a **aucune lumière** dans la scène : les ombres et les lumières sont
 peintes dans les textures (section 7). Pour changer l'éclairage, il faut
 refaire le rendu des textures dans Blender.
@@ -241,7 +293,7 @@ Ce que le site charge (`frontend/src/assets/`) :
 | Fichier | Contenu | Vient de |
 | --- | --- | --- |
 | `room.glb` | Le modèle 3D, sans textures (130 Ko). | `Ressources/bundle_001/models/room_assemble_no-textures_001.glb` |
-| `room-base.png` | Texture de toute la chambre, lumières comprises. | `Ressources/bundle_001/textures/room_baseColor.png` |
+| `room-base.jpg` | Texture de toute la chambre, lumières comprises, agrandie à 2048 px. | `Ressources/bundle_001/textures/room_baseColor.png`, passé par `tools/upscale-texture.py` |
 | `posters-base.jpg` | Planche des petits posters du mur. | `Ressources/bundle_001/textures/posters_baseColor_002.png`, converti en JPEG |
 
 Les fichiers sources (`.blend`, textures d'origine) sont dans
@@ -254,7 +306,7 @@ chaque **matériau** du modèle, d'après son nom dans Blender :
 
 | Matériau Blender | Texture appliquée |
 | --- | --- |
-| `room_mat` | `room-base.png` |
+| `room_mat` | `room-base.jpg` |
 | `posters_mat` | `posters-base.jpg` |
 | `main_posters_mat` | Un morceau de `posters-base.jpg`, choisi dans `config.ts` (voir plus bas) |
 | `screen_mat` | Une image animée dessinée par le code (`createScreen`) |
@@ -264,15 +316,36 @@ chaque **matériau** du modèle, d'après son nom dans Blender :
 1. Exporter depuis Blender en glTF binaire (`.glb`), **sans** les textures, en
    gardant les noms de matériaux ci-dessus.
 2. Remplacer `frontend/src/assets/room.glb` et les textures qui ont changé.
-3. Convertir la planche des posters en JPEG pour l'alléger (6,5 Mo → 1,5 Mo).
+3. Agrandir la texture de la chambre (voir « Netteté des textures » plus bas),
+   ou la copier telle quelle sous le nom `room-base.jpg` si elle est déjà
+   livrée en grand.
+4. Convertir la planche des posters en JPEG pour l'alléger (6,5 Mo → 1,5 Mo).
    Sur Mac :
    ```sh
    sips -s format jpeg -s formatOptions 85 posters_baseColor_002.png --out frontend/src/assets/posters-base.jpg
    ```
-4. Ouvrir http://localhost:5173/?debug et vérifier que les zones entourent
+5. Ouvrir http://localhost:5173/?debug et vérifier que les zones entourent
    toujours leurs objets (section 1). Si un meuble a bougé, ajuster sa zone.
-5. Si la taille de la pièce a changé : ajuster `FIT` et `HOME_TARGET`
-   (section 6), et `ROOM` dans `frontend/tests/unit/config.test.ts`.
+6. Si la taille de la pièce a changé : ajuster `FIT` et `HOME_TARGET`
+   (section 6), `ROOM` dans `frontend/src/enclosure.ts` et dans
+   `frontend/tests/unit/config.test.ts`.
+
+### Netteté des textures
+
+La texture livrée fait 768 pixels pour toute la chambre : suffisant de loin,
+flou de près dans la vue intérieure. Les images d'origine qui ont servi à la
+peindre dans Blender (`room_baking…`, `room_ao…`) ne sont pas dans le bundle :
+on ne peut donc pas la recalculer en plus grand depuis les fichiers `.blend`.
+
+En attendant, `tools/upscale-texture.py` l'agrandit à 2048 pixels avec un
+réseau de neurones (EDSR, via OpenCV) : les bords deviennent nets, mais aucun
+détail n'est inventé. Les commandes sont en tête du script. Il remplit aussi
+les zones vides de la planche avec les couleurs voisines, pour qu'aucun liseré
+blanc n'apparaisse au bord des objets.
+
+Le vrai remède est côté Blender : refaire le rendu des textures en 2048 ou
+4096 pixels (ou en deux ou trois planches), et fournir les images des grands
+posters et de l'écran. Il n'y a alors rien à changer dans le code.
 
 Un matériau dont le nom n'est pas dans le tableau reste sans texture et un
 avertissement apparaît dans la console du navigateur : ajouter une ligne à
@@ -426,6 +499,8 @@ plus : vérifier alors si le correctif est encore nécessaire et le retirer.
 | Page blanche sur http://localhost:8080 | Le front n'est pas compilé : `docker compose run --rm frontend-build`. |
 | « La chambre en 3D n'a pas pu s'afficher » | Le navigateur n'a pas de 3D (WebGL), ou un fichier de `src/assets/` manque : l'erreur précise est dans la console. Le menu reste utilisable. |
 | L'image clignote quand un panneau s'ouvre ou se ferme | Quelque chose redimensionne la zone 3D (`.stage` dans le CSS). Elle doit garder la taille de l'écran : voir `setInset` dans `view.ts`. |
+| Dans la vue intérieure, un objet est mal cadré ou caché | Ajouter `viewFrom: [x, y, z]` à cet objet dans `config.ts` (section 6). |
+| On voit le vide derrière un mur dans la vue intérieure | Les dimensions `ROOM` de `enclosure.ts` ne correspondent plus au modèle. |
 | Un objet ne réagit pas au clic | Ouvrir avec `?debug` : sa zone ne l'entoure plus, ou un autre meuble passe devant lui. |
 | La mauvaise chose s'éclaire au survol | Zone trop large : elle englobe les faces du voisin. |
 | La boutique locale affiche les produits fictifs | La page ne reçoit pas sa configuration : vérifier que le code source de la page contient `data-slimroom="…"`. |
