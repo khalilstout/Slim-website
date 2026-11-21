@@ -50,6 +50,7 @@ class SlimRoom extends Module
             'slimroom_assets' => $this->getPathUri() . 'views/dist/assets/',
             // Change à chaque nouveau build : évite de servir un vieux JS depuis le cache.
             'slimroom_version' => file_exists($dist . 'room.js') ? filemtime($dist . 'room.js') : $this->version,
+            // Lu par le front dans l'attribut data-slimroom de la page (voir room.tpl).
             'slimroom_config' => json_encode([
                 'apiUrl' => $link->getModuleLink($this->name, 'api'),
                 'cartUrl' => $link->getPageLink('cart'),
@@ -58,7 +59,32 @@ class SlimRoom extends Module
         ]);
 
         header('Content-Type: text/html; charset=utf-8');
-        $html = $this->context->smarty->fetch($this->getLocalPath() . 'views/templates/front/room.tpl');
+        header('X-Content-Type-Options: nosniff');
+        header('Referrer-Policy: strict-origin-when-cross-origin');
+        header('X-Frame-Options: SAMEORIGIN');
+        header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+        // Politique de sécurité de la page : rien ne se charge hors du site, sauf
+        // les vidéos YouTube des easter eggs. À compléter si on ajoute un service externe.
+        header('Content-Security-Policy: ' . implode('; ', [
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "connect-src 'self' blob: data:",
+            'frame-src https://www.youtube-nocookie.com',
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'self'",
+        ]));
+        // Selon le réglage « compilation des templates » de la boutique, Smarty peut
+        // resservir indéfiniment une ancienne version de room.tpl. On lui demande
+        // de vérifier la date du fichier, le temps de ce rendu.
+        $smarty = $this->context->smarty;
+        $compileCheck = $smarty->getCompileCheck();
+        $smarty->setCompileCheck(true);
+        $html = $smarty->fetch($this->getLocalPath() . 'views/templates/front/room.tpl');
+        $smarty->setCompileCheck($compileCheck);
         // En mode développement, PrestaShop entoure les templates de commentaires ;
         // placés avant le doctype, ils feraient passer le navigateur en mode « quirks ».
         echo trim(preg_replace('/<!-- (begin|end) \S+ -->/', '', $html));

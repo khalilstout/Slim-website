@@ -3,6 +3,8 @@
  * API JSON du front 3D.
  *   GET …/module/slimroom/api            → { categories, cart }
  *   GET …/module/slimroom/api?only=cart  → { count, items, total, checkoutUrl }
+ * Lecture seule : toute modification du panier passe par le contrôleur natif
+ * de PrestaShop (protégé par jeton), jamais par ce fichier.
  */
 class SlimRoomApiModuleFrontController extends ModuleFrontController
 {
@@ -15,8 +17,18 @@ class SlimRoomApiModuleFrontController extends ModuleFrontController
 
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
         $this->ajaxRender(json_encode($data));
         exit;
+    }
+
+    private function imageUrl($linkRewrite, $idImage)
+    {
+        if (empty($idImage) || strpos((string) $idImage, 'default') !== false) {
+            return null;
+        }
+
+        return $this->context->link->getImageLink($linkRewrite, $idImage, 'home_default');
     }
 
     private function formatPrice($amount)
@@ -37,15 +49,12 @@ class SlimRoomApiModuleFrontController extends ModuleFrontController
             $category = new Category((int) $row['id_category'], $idLang);
             $products = [];
             foreach ($category->getProducts($idLang, 1, 100) ?: [] as $product) {
-                $hasImage = !empty($product['id_image']) && strpos($product['id_image'], 'default') === false;
                 $products[] = [
                     'id' => (int) $product['id_product'],
                     'attributeId' => (int) $product['id_product_attribute'],
                     'name' => $product['name'],
                     'price' => $this->formatPrice((float) $product['price']),
-                    'image' => $hasImage
-                        ? $this->context->link->getImageLink($product['link_rewrite'], $product['id_image'], 'home_default')
-                        : null,
+                    'image' => $this->imageUrl($product['link_rewrite'], $product['id_image']),
                 ];
             }
             $result[] = [
@@ -69,8 +78,14 @@ class SlimRoomApiModuleFrontController extends ModuleFrontController
             foreach ($cart->getProducts() as $product) {
                 $count += (int) $product['cart_quantity'];
                 $items[] = [
+                    'id' => (int) $product['id_product'],
+                    'attributeId' => (int) $product['id_product_attribute'],
                     'name' => $product['name'],
+                    // Déclinaison choisie (« Taille : M »), vide pour un produit simple.
+                    'detail' => (string) ($product['attributes_small'] ?? ''),
                     'quantity' => (int) $product['cart_quantity'],
+                    'price' => $this->formatPrice((float) $product['price_wt']),
+                    'image' => $this->imageUrl($product['link_rewrite'] ?? '', $product['id_image'] ?? null),
                     'total' => $this->formatPrice((float) $product['total_wt']),
                 ];
             }

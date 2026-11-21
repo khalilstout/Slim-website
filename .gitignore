@@ -2,3 +2,12 @@ node_modules/
 dist/
 .env
 .DS_Store
+
+# Rapports de tests
+coverage/
+playwright-report/
+test-results/
+
+# Sources Blender et exports bruts : trop lourds pour git (voir docs/guide-modifications.md)
+Ressources/*.zip
+Ressources/*.glb

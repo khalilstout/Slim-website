@@ -1,0 +1,7 @@
+# Alertes Trivy acceptées, avec la raison. Une ligne = un identifiant.
+
+# DS-0002 « le conteneur démarre en root » : l'image officielle PrestaShop en a
+# besoin pour démarrer Apache et s'installer ; les requêtes sont ensuite servies
+# par l'utilisateur www-data. À revoir au moment du choix de l'hébergeur.
+DS-0002
+AVD-DS-0002

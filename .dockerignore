@@ -1,3 +1,11 @@
 .git
+.github
 **/node_modules
 **/dist
+Ressources
+docs
+tests
+frontend/tests
+frontend/coverage
+frontend/playwright-report
+frontend/test-results
