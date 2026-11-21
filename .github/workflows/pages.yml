@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read # l'étape de déploiement doit retrouver l'archive du site produite juste avant
       pages: write
       id-token: write
     environment:
