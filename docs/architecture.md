@@ -65,7 +65,10 @@ Le reste du code ne connaît que l'interface `Shop` et ignore dans quel mode il
 tourne. Les deux fichiers d'entrée portent des noms fixes (`assets/room.js`,
 `assets/room.css`) pour que le module puisse les référencer ; le modèle et les
 textures portent une empreinte dans leur nom (`room-base-BwCe….png`) : quand
-ils changent, leur adresse change, et le navigateur ne ressert pas l'ancien.
+ils changent, leur adresse change, et le navigateur ne ressert pas l'ancien. Pour
+`room.js` et `room.css`, c'est un numéro de version ajouté à leur adresse qui
+joue ce rôle : par le module dans PrestaShop, par `vite.config.ts` dans la page
+de la démo.
 
 ### Parcours d'un clic
 
