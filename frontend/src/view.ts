@@ -1,22 +1,28 @@
-// Vue 3D : rendu, caméra, survol / clic sur les objets, bulles.
+// Vue 3D : rendu, caméra, survol / clic sur les objets, bulles, animation d'arrivée.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ambiance, type Interactable } from './config';
+import type { Room } from './room';
+import { zoneAt, zoneCenter, zoneContains } from './zones';
 
 const FOV = 36;
-const HOME_TARGET = new THREE.Vector3(0, 1.05, 0);
+const HOME_TARGET = new THREE.Vector3(0, 0.9, 0);
 // Direction de la caméra au repos : dans l'angle ouvert de la chambre, un peu au-dessus.
-const HOME_AZIMUTH = Math.PI / 4;
-const HOME_POLAR = 1.05;
-const FOCUS_RATIO = 0.56; // distance caméra quand un objet est sélectionné, par rapport à la vue d'ensemble
+const HOME_AZIMUTH = -Math.PI / 4;
+const HOME_POLAR = 1.08;
+/** Taille de la chambre à faire tenir à l'écran (largeur vue de l'angle, hauteur). */
+const FIT = { width: 8.6, widthPortrait: 7.7, height: 7.1 };
+const FOCUS_RATIO = 0.66; // distance caméra quand un objet est sélectionné, par rapport à la vue d'ensemble
 const INTRO_HEIGHT = 6; // hauteur d'où descend la chambre à l'arrivée
-const HIGHLIGHT = new THREE.Color(0x4a3a18);
+const INTRO_DARK = 0.12; // luminosité de la chambre au début de l'arrivée (elle « s'allume »)
+const HIGHLIGHT_OPACITY = 0.28;
 
 interface Entry {
   item: Interactable;
-  object: THREE.Object3D;
-  materials: { material: THREE.MeshStandardMaterial; base: THREE.Color }[];
+  /** Copie des faces de l'objet, affichée par-dessus pour le surligner. */
+  glow: THREE.MeshBasicMaterial;
+  glowGoal: number;
   center: THREE.Vector3;
   anchor: THREE.Vector3;
   label: HTMLButtonElement | null;
@@ -24,8 +30,6 @@ interface Entry {
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-/** Dépasse légèrement 1 avant d'y revenir : effet « pop ». */
-const easeOutBack = (t: number) => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
 
 /** Texture ronde et douce, pour les particules et le halo. */
 function glowTexture(inner: string, outer: string): THREE.CanvasTexture {
@@ -47,7 +51,7 @@ function buildAmbiance(scene: THREE.Scene): THREE.Points {
   const halo = new THREE.Mesh(
     new THREE.PlaneGeometry(22, 22),
     new THREE.MeshBasicMaterial({
-      map: glowTexture('rgb(255 150 70 / 0.55)', 'rgb(255 120 60 / 0)'),
+      map: glowTexture('rgb(255 150 70 / 0.5)', 'rgb(255 120 60 / 0)'),
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
@@ -63,7 +67,7 @@ function buildAmbiance(scene: THREE.Scene): THREE.Points {
   const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < ambiance.particles; i++) {
     const angle = rand() * Math.PI * 2;
-    const radius = 5 + rand() * 3.5; // pas trop loin : une poussière collée à la caméra ferait une grosse tache
+    const radius = 5.5 + rand() * 3; // pas trop loin : une poussière collée à la caméra ferait une grosse tache
     positions[i * 3] = Math.cos(angle) * radius;
     positions[i * 3 + 1] = -4 + rand() * 12;
     positions[i * 3 + 2] = Math.sin(angle) * radius;
@@ -74,7 +78,7 @@ function buildAmbiance(scene: THREE.Scene): THREE.Points {
     geometry,
     new THREE.PointsMaterial({
       map: glowTexture('rgb(255 225 170 / 1)', 'rgb(255 200 140 / 0)'),
-      size: 0.16,
+      size: 0.12,
       transparent: true,
       opacity: 0.75,
       depthWrite: false,
@@ -83,6 +87,33 @@ function buildAmbiance(scene: THREE.Scene): THREE.Points {
   );
   scene.add(dust);
   return dust;
+}
+
+/**
+ * Regroupe, pour chaque zone, les faces du modèle qui s'y trouvent entièrement.
+ * Affichées par-dessus en surbrillance, elles « allument » l'objet survolé.
+ */
+function collectFaces(room: THREE.Object3D, items: Interactable[]): Map<string, number[]> {
+  const faces = new Map<string, number[]>(items.map((item) => [item.id, []]));
+  const corners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  room.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const position = mesh.geometry.getAttribute('position');
+    const index = mesh.geometry.index;
+    const count = index ? index.count : position.count;
+    for (let i = 0; i < count; i += 3) {
+      corners.forEach((corner, k) =>
+        corner.fromBufferAttribute(position, index ? index.getX(i + k) : i + k).applyMatrix4(mesh.matrixWorld),
+      );
+      for (const item of items) {
+        if (corners.every((corner) => zoneContains(item.zone, corner, 0.02))) {
+          faces.get(item.id)!.push(...corners.flatMap((corner) => [corner.x, corner.y, corner.z]));
+        }
+      }
+    }
+  });
+  return faces;
 }
 
 export interface RoomView {
@@ -95,39 +126,29 @@ export interface RoomView {
 export function createRoomView(
   container: HTMLElement,
   labelLayer: HTMLElement,
-  room: THREE.Object3D,
+  room: Room,
   interactables: Interactable[],
   onSelect: (id: string) => void,
 ): RoomView {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // Les couleurs viennent telles quelles des textures peintes dans Blender.
+  renderer.toneMapping = THREE.NoToneMapping;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.add(room);
-  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x8a5a3c, 1.25));
-  const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
-  sun.position.set(4.5, 9, 7);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -6;
-  sun.shadow.camera.right = sun.shadow.camera.top = 6;
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 25;
-  sun.shadow.radius = 5;
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.025;
-  scene.add(sun);
-  // Lueur chaude venant des fenêtres.
-  const windowGlow = new THREE.PointLight(0xffa640, 6, 5, 1.5);
-  windowGlow.position.set(-2.3, 1.6, 0.6);
-  scene.add(windowGlow);
-
+  // `stage` porte la chambre et ses surbrillances : c'est lui qu'anime l'arrivée.
+  const stage = new THREE.Group();
+  stage.add(room.object);
+  scene.add(stage);
   const dust = buildAmbiance(scene);
+
+  const roomMaterials = new Set<THREE.MeshBasicMaterial>();
+  room.object.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (mesh.isMesh) roomMaterials.add(mesh.material as THREE.MeshBasicMaterial);
+  });
+  const setBrightness = (value: number) => roomMaterials.forEach((material) => material.color.setScalar(value));
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 100);
   const homeDirection = new THREE.Vector3().setFromSphericalCoords(1, HOME_POLAR, HOME_AZIMUTH);
@@ -138,32 +159,41 @@ export function createRoomView(
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.rotateSpeed = 0.6;
-  controls.minAzimuthAngle = HOME_AZIMUTH - 0.6;
-  controls.maxAzimuthAngle = HOME_AZIMUTH + 0.6;
-  controls.minPolarAngle = 0.7;
-  controls.maxPolarAngle = 1.4;
+  controls.minAzimuthAngle = HOME_AZIMUTH - 0.55;
+  controls.maxAzimuthAngle = HOME_AZIMUTH + 0.55;
+  controls.minPolarAngle = 0.75;
+  controls.maxPolarAngle = 1.42;
 
   // ----- Objets cliquables -----
-  const entries: Entry[] = [];
-  room.updateMatrixWorld(true); // nécessaire pour mesurer les objets imbriqués
-  for (const item of interactables) {
-    const object = room.getObjectByName(item.id);
-    if (!object) {
-      console.warn(`[room] objet « ${item.id} » introuvable dans la scène`);
-      continue;
-    }
-    const materials: Entry['materials'] = [];
-    object.traverse((node) => {
-      const mesh = node as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      // Matériau propre à l'objet, pour le surligner sans toucher aux autres.
-      const material = (mesh.material as THREE.MeshStandardMaterial).clone();
-      mesh.material = material;
-      if (material.emissive) materials.push({ material, base: material.emissive.clone() });
+  room.object.updateMatrixWorld(true);
+  const faces = collectFaces(room.object, interactables);
+  const debug = new URLSearchParams(location.search).has('debug');
+  const entries: Entry[] = interactables.map((item) => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(faces.get(item.id) ?? [], 3));
+    const glow = new THREE.MeshBasicMaterial({
+      color: 0xffe2b0,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      // Légèrement devant les faces d'origine, pour ne pas scintiller.
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     });
-    const bounds = new THREE.Box3().setFromObject(object);
-    const center = bounds.getCenter(new THREE.Vector3());
-    const anchor = new THREE.Vector3(center.x, bounds.max.y + 0.12, center.z);
+    const overlay = new THREE.Mesh(geometry, glow);
+    overlay.visible = false;
+    overlay.name = `glow:${item.id}`;
+    stage.add(overlay);
+    glow.userData.mesh = overlay;
+
+    const { min, max } = item.zone;
+    const center = new THREE.Vector3(...zoneCenter(item.zone));
+    const anchor = new THREE.Vector3(center.x, max[1] + 0.1, center.z);
+    if (debug) {
+      stage.add(new THREE.Box3Helper(new THREE.Box3(new THREE.Vector3(...min), new THREE.Vector3(...max)), 0x00ffcc));
+    }
 
     let label: HTMLButtonElement | null = null;
     if (item.label) {
@@ -173,14 +203,16 @@ export function createRoomView(
       label.addEventListener('click', () => onSelect(item.id));
       labelLayer.appendChild(label);
     }
-    entries.push({ item, object, materials, center, anchor, label });
-  }
+    return { item, glow, glowGoal: 0, center, anchor, label };
+  });
 
   let highlighted: Entry | null = null;
   function highlight(entry: Entry | null) {
     if (entry === highlighted) return;
-    highlighted?.materials.forEach(({ material, base }) => material.emissive.copy(base));
-    entry?.materials.forEach(({ material, base }) => material.emissive.copy(base).add(HIGHLIGHT));
+    if (highlighted) highlighted.glowGoal = 0;
+    if (entry) entry.glowGoal = HIGHLIGHT_OPACITY;
+    highlighted?.label?.classList.remove('hover');
+    entry?.label?.classList.add('hover');
     highlighted = entry;
     renderer.domElement.style.cursor = entry ? 'pointer' : 'grab';
   }
@@ -194,14 +226,10 @@ export function createRoomView(
       -((event.clientY - rect.top) / rect.height) * 2 + 1,
     );
     raycaster.setFromCamera(pointer, camera);
-    // On teste toute la chambre : un objet caché derrière un meuble n'est pas cliquable.
-    const hit = raycaster.intersectObject(room, true)[0];
+    // Premier point touché sur la chambre : un objet caché derrière un meuble n'est pas cliquable.
+    const hit = raycaster.intersectObject(room.object, true)[0];
     if (!hit) return null;
-    for (let node: THREE.Object3D | null = hit.object; node; node = node.parent) {
-      const entry = entries.find((e) => e.object === node);
-      if (entry) return entry;
-    }
-    return null;
+    return zoneAt(entries.map((entry) => ({ entry, zone: entry.item.zone })), hit.point)?.entry ?? null;
   }
 
   let focused: Entry | null = null;
@@ -236,8 +264,8 @@ export function createRoomView(
     camera.updateProjectionMatrix();
     // Distance à laquelle la chambre remplit l'écran (un peu plus serré en portrait).
     const half = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-    const fitWidth = camera.aspect < 1 ? 7.9 : 8.3;
-    baseDistance = Math.max(7.3 / (2 * half), fitWidth / (2 * half * camera.aspect));
+    const fitWidth = camera.aspect < 1 ? FIT.widthPortrait : FIT.width;
+    baseDistance = Math.max(FIT.height / (2 * half), fitWidth / (2 * half * camera.aspect));
     controls.minDistance = baseDistance * 0.35;
     controls.maxDistance = baseDistance * 1.15;
     goal.distance = focused ? baseDistance * FOCUS_RATIO : baseDistance;
@@ -245,18 +273,17 @@ export function createRoomView(
   }
   resize();
 
-  // ----- Animation d'arrivée : la chambre descend en tournant, puis les meubles apparaissent -----
+  // ----- Animation d'arrivée : la chambre descend en tournant, puis s'allume -----
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let intro = ambiance.intro && !reducedMotion;
   let introStart = 0;
-  const furniture = room.children.filter((child) => child.type === 'Group');
   let markReady: () => void = () => undefined;
   const ready = new Promise<void>((resolve) => (markReady = resolve));
   function endIntro() {
     intro = false;
-    room.position.y = 0;
-    room.rotation.y = 0;
-    furniture.forEach((object) => object.scale.setScalar(1));
+    stage.position.y = 0;
+    stage.rotation.y = 0;
+    setBrightness(1);
     controls.enabled = true;
     labelLayer.classList.add('ready');
     markReady();
@@ -264,20 +291,18 @@ export function createRoomView(
   function playIntro(now: number) {
     introStart ||= now;
     const t = clamp01((now - introStart) / (ambiance.introDuration * 1000));
-    const drop = easeOutCubic(clamp01(t / 0.7));
-    room.position.y = (1 - drop) * INTRO_HEIGHT;
-    room.rotation.y = (1 - drop) * -Math.PI * 1.5;
-    furniture.forEach((object, index) => {
-      const pop = clamp01((t - 0.5 - (index / furniture.length) * 0.3) / 0.2);
-      object.scale.setScalar(Math.max(0.001, easeOutBack(pop)));
-    });
+    const drop = easeOutCubic(clamp01(t / 0.75));
+    stage.position.y = (1 - drop) * INTRO_HEIGHT;
+    stage.rotation.y = (1 - drop) * -Math.PI * 1.5;
+    // La lumière monte sur la fin de la descente.
+    setBrightness(INTRO_DARK + (1 - INTRO_DARK) * easeOutCubic(clamp01((t - 0.35) / 0.65)));
     if (t >= 1) endIntro();
   }
   camera.position.copy(HOME_TARGET).addScaledVector(homeDirection, baseDistance * (intro ? 1.5 : 1));
   if (intro) {
     controls.enabled = false;
-    furniture.forEach((object) => object.scale.setScalar(0.001));
-    room.position.y = INTRO_HEIGHT;
+    stage.position.y = INTRO_HEIGHT;
+    setBrightness(INTRO_DARK);
   } else {
     endIntro();
   }
@@ -288,6 +313,7 @@ export function createRoomView(
   function frame(now: number) {
     requestAnimationFrame(frame);
     if (intro) playIntro(now);
+    room.update(now);
     dust.rotation.y = now * 0.00002;
     dust.position.y = Math.sin(now * 0.0003) * 0.35;
     const ease = intro ? 0.03 : 0.08; // la caméra s'approche plus lentement pendant l'arrivée
@@ -303,6 +329,13 @@ export function createRoomView(
       }
     }
     controls.update();
+
+    for (const entry of entries) {
+      // Surbrillance en fondu, avec une légère respiration quand elle est allumée.
+      const pulse = entry.glowGoal ? 1 + 0.25 * Math.sin(now * 0.005) : 1;
+      entry.glow.opacity += (entry.glowGoal * pulse - entry.glow.opacity) * 0.18;
+      (entry.glow.userData.mesh as THREE.Mesh).visible = entry.glow.opacity > 0.004;
+    }
     renderer.render(scene, camera);
 
     const width = container.clientWidth;

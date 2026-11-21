@@ -1,0 +1,147 @@
+# Sécurité : failles connues dans les dépendances, analyse du code, secrets
+# oubliés, configuration Docker. Tourne sur chaque pull request, sur main, et
+# chaque lundi (une faille peut être publiée sans que le code ait changé).
+# Que faire quand un job est rouge : docs/tests-et-ci.md
+name: Sécurité
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  npm-audit:
+    name: Dépendances npm · failles connues
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Ce qui part chez les visiteurs (bloquant dès « modéré »)
+        run: npm audit --omit=dev --audit-level=moderate
+        working-directory: frontend
+      - name: Outils de développement (bloquant dès « élevé »)
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+  dependency-review:
+    name: Nouvelles dépendances de la pull request
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+        with:
+          fail-on-severity: high
+
+  codeql:
+    name: CodeQL · ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # publier les résultats dans l'onglet « Security »
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          category: /language:${{ matrix.language }}
+
+  semgrep:
+    name: Semgrep · PHP, TypeScript, Docker, workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # CodeQL n'analyse pas le PHP : Semgrep couvre le module PrestaShop.
+      - name: Analyse statique
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src \
+            semgrep/semgrep@sha256:67518c174185a2043fdbed16c70631b79209499b3671178e7194379b48295a0d \
+            semgrep scan --error --metrics=off \
+              --config p/php --config p/javascript --config p/typescript \
+              --config p/dockerfile --config p/github-actions \
+              --config p/security-audit --config p/secrets
+
+  trivy-repo:
+    name: Trivy · dépôt (failles, secrets, configuration)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          trivyignores: .trivyignore
+
+  trivy-image:
+    # L'image contient PrestaShop et son système : la plupart des failles signalées
+    # viennent de l'image officielle et se corrigent en montant sa version dans le
+    # Dockerfile. Ce job informe (résumé du run) sans bloquer.
+    name: Trivy · image Docker (rapport, non bloquant)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -t slimroom:scan .
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: slimroom:scan
+          scanners: vuln
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+          format: table
+          output: trivy-image.txt
+      - name: Résumé
+        run: |
+          {
+            echo '### Failles critiques corrigeables dans l'"'"'image'
+            echo '```'
+            head -c 60000 trivy-image.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  gitleaks:
+    name: Gitleaks · secrets dans tout l'historique
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tout l'historique : un secret supprimé reste lisible dans les anciens commits
+          persist-credentials: false
+      - run: |
+          docker run --rm -v "$PWD:/repo" \
+            ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            detect --source /repo --redact --no-banner

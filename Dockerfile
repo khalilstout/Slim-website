@@ -12,6 +12,7 @@ FROM prestashop/prestashop:9.2.1-apache
 # L'installeur de PrestaShop 9 supprime lui-même son dossier install/ ; le script
 # de démarrage de l'image tente de le supprimer une seconde fois, échoue, et le
 # conteneur s'arrête avant les scripts post-installation. On rend ce `rm` tolérant.
+# hadolint ignore=SC2016
 RUN sed -i 's|rm -r /var/www/html/\$PS_FOLDER_INSTALL/|rm -rf /var/www/html/$PS_FOLDER_INSTALL/|' /tmp/docker_run.sh \
     && grep -q 'rm -rf /var/www/html/\$PS_FOLDER_INSTALL/' /tmp/docker_run.sh
 COPY --chown=www-data:www-data prestashop/modules/slimroom /var/www/html/modules/slimroom

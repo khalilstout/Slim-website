@@ -12,7 +12,7 @@ export default defineConfig({
         entryFileNames: 'assets/room.js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: (asset) =>
-          asset.names?.[0]?.endsWith('.css') ? 'assets/room.css' : 'assets/[name][extname]',
+          asset.names?.[0]?.endsWith('.css') ? 'assets/room.css' : 'assets/[name]-[hash][extname]',
       },
     },
     chunkSizeWarningLimit: 1200,

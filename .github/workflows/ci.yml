@@ -1,0 +1,136 @@
+# Intégration continue : tout ce qui doit être vert avant de fusionner.
+# Détail de chaque job et façon de le lancer en local : docs/tests-et-ci.md
+#
+# Les actions sont épinglées sur un commit précis (le numéro de version est en
+# commentaire) : une étiquette comme « v4 » peut être déplacée par son auteur,
+# pas un commit. Dependabot propose les mises à jour (.github/dependabot.yml).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  front:
+    name: Front · lint, types, tests unitaires, build (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+      - name: Le build produit les fichiers attendus par le module PrestaShop
+        run: test -s dist/index.html && test -s dist/assets/room.js && test -s dist/assets/room.css
+
+  e2e:
+    name: Navigateur · ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { project: chromium, browser: chromium }
+          - { project: firefox, browser: firefox }
+          - { project: webkit, browser: webkit }
+          - { project: mobile-chrome, browser: chromium }
+          - { project: mobile-safari, browser: webkit }
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: npm run build
+      - run: npx playwright test --project=${{ matrix.project }}
+      - name: Rapport en cas d'échec (captures, traces)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-${{ matrix.project }}
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
+
+  php:
+    name: PHP ${{ matrix.php }} · syntaxe du module
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.2', '8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: php -l sur chaque fichier
+        run: |
+          docker run --rm -v "$PWD/prestashop:/code:ro" "php:${{ matrix.php }}-cli-alpine" \
+            sh -c 'set -e; find /code -name "*.php" | while read -r file; do php -l "$file"; done'
+
+  lint-infra:
+    name: Dockerfile et workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: hadolint (Dockerfile)
+        run: docker run --rm -i hadolint/hadolint@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d < Dockerfile
+      - name: actionlint (workflows GitHub Actions)
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.7 -color
+      - name: docker compose (fichier valide)
+        run: docker compose config --quiet
+
+  integration:
+    name: Intégration · vraie boutique PrestaShop
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Démarrer la boutique (MySQL + PrestaShop + module + front)
+        run: docker compose up -d --build
+      - name: Page d'accueil, en-têtes de sécurité, API, parcours panier
+        run: python3 tests/integration/smoke.py http://localhost:8080 1200
+      - name: Journaux en cas d'échec
+        if: failure()
+        run: docker compose logs --tail 200
+      - name: Arrêter
+        if: always()
+        run: docker compose down -v
