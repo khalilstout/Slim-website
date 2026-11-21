@@ -32,7 +32,7 @@ Vite + TypeScript + three.js, sans framework d'interface.
 | `src/main.ts` | L'interface : barre du haut, panneau (rayon, texte, vidéo, panier), notification, écran de chargement. |
 | `src/view.ts` | La vue 3D : rendu, caméra, clic et survol des objets, bulles, animation d'arrivée, décor autour de la chambre. |
 | `src/room.ts` | La chambre : charge le modèle Blender et lui applique ses textures. |
-| `src/character.ts` | Le petit bonhomme : ses formes, sa marche vers l'objet ouvert. |
+| `src/character.ts` | Le bonhomme : ses formes, sa marche vers l'objet ouvert. |
 | `src/zones.ts` | Les calculs sur les zones cliquables (un point est-il dans une boîte ?). Sans dépendance, donc facile à tester. |
 | `src/shop.ts` | L'accès à la boutique, derrière l'interface `Shop`. |
 | `src/style.css` | Tous les styles. |

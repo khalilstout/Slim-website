@@ -63,8 +63,9 @@ Commandes utiles :
 - La chambre est le modèle Blender (`bundle_001`). Il est fusionné en une seule
   pièce : les objets cliquables sont des zones réglées à la main dans
   `config.ts`, à réajuster si un meuble bouge dans une prochaine version.
-- Le petit bonhomme est une version 3D simple, construite dans le code d'après
-  le dessin `Ressources/imageh.png`, pas un modèle fait par un graphiste.
+- Le bonhomme est construit en formes simples dans le code, d'après une photo
+  de référence : ce n'est pas un modèle sculpté par un graphiste. Un vrai
+  modèle animé pourra le remplacer sans toucher au reste (voir le guide).
 - Les deux grands posters et l'écran de l'ordinateur n'ont pas encore leur
   image définitive : ils affichent un contenu provisoire (voir le guide,
   section 7).

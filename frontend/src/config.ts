@@ -95,16 +95,16 @@ export const mainPosters: { crop: [number, number, number, number] }[] = [
 ];
 
 /**
- * Le petit bonhomme. Quand on ouvre un objet, il marche en ligne droite
+ * Le bonhomme. Quand on ouvre un objet, il marche en ligne droite
  * jusqu'au point de `walkArea` le plus proche de cet objet, et le regarde.
  */
 export const character = {
   /** `false` le retire complètement de la chambre. */
   enabled: true,
-  /** Taille en mètres, hélice comprise (le bureau fait 0,8 m de haut). */
-  height: 1.05,
+  /** Taille en mètres, casquette comprise (le bureau fait 0,8 m de haut, l'armoire 2,6 m). */
+  height: 1.74,
   /** Vitesse de marche, en mètres par seconde. */
-  speed: 1.5,
+  speed: 1.3,
   /** Où il attend à l'ouverture de la page : [x, z]. */
   start: [-0.1, 0.9] as [number, number],
   /** Vers où il regarde au départ (radians ; -π/4 = vers la caméra). */

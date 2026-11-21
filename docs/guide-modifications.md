@@ -26,7 +26,7 @@ unitaires). Voir [tests-et-ci.md](tests-et-ci.md).
 6. [Caméra et surbrillance](#6-caméra-et-surbrillance)
 7. [La chambre : modèle Blender et textures](#7-la-chambre--modèle-blender-et-textures)
 8. [Nouveau type de panneau](#8-nouveau-type-de-panneau)
-   (et [le petit bonhomme](#le-petit-bonhomme), en fin de section 7)
+   (et [le bonhomme](#le-bonhomme), en fin de section 7)
 9. [Données venant de PrestaShop](#9-données-venant-de-prestashop)
 10. [Versions et dépendances](#10-versions-et-dépendances)
 11. [En cas de problème](#11-en-cas-de-problème)
@@ -295,17 +295,20 @@ mettre une image fixe : charger la texture comme les autres et l'associer à
 `screen_mat`. `Ressources/bundle_001/textures/uv_checker_1024.png` est une
 mire de test, pratique pour vérifier l'orientation.
 
-### Le petit bonhomme
+### Le bonhomme
 
-Il n'y a pas de fichier 3D : il est construit en formes simples dans
-`frontend/src/character.ts`, d'après la planche `Ressources/imageh.png`.
+Il n'y a pas de fichier 3D : il est construit en formes lisses dans
+`frontend/src/character.ts`, à taille adulte, d'après une photo de référence
+(cheveux bouclés, lunettes rondes, casquette à quartiers, t-shirt jaune, short
+rouge, chaussettes roses, sabots blancs). La planche `Ressources/imageh.png`
+est une première piste de personnage, gardée pour mémoire.
 
 Réglages courants : `frontend/src/config.ts`, objet `character`.
 
 | Réglage | Effet |
 | --- | --- |
 | `enabled` | `false` le retire de la chambre. |
-| `height` | Sa taille en mètres. |
+| `height` | Sa taille en mètres, casquette comprise (l'armoire fait 2,6 m, le bureau 0,8 m). |
 | `speed` | Sa vitesse de marche. |
 | `start`, `startFacing` | Où il attend à l'ouverture de la page, et vers où il regarde. |
 | `walkArea` | Le rectangle de sol où il a le droit de marcher. |
@@ -324,10 +327,14 @@ Pour changer son apparence, dans `character.ts` :
 
 | Élément | Où |
 | --- | --- |
-| Couleurs (peau, cheveux, casquette, t-shirt…) | `COLORS`, en haut du fichier |
-| Visage, fleur du t-shirt | `drawFace`, `drawFlower` (dessinés au trait, comme sur un calque) |
-| Formes du corps, de la tête, de la casquette | `createCharacter`, une ligne `mesh(...)` par forme |
-| Balancement des jambes et des bras, sautillement, hélice | fin de `update` |
+| Couleurs (peau, cheveux, casquette, t-shirt, short, chaussettes…) | `COLORS`, en haut du fichier |
+| Visage, motif du t-shirt | `drawFace`, `drawShirtPrint` (dessinés au trait, comme sur un calque) |
+| Formes du corps, lunettes, cheveux, casquette | `createCharacter`, une ligne `mesh(...)` par forme, rangées par partie du corps |
+| Démarche (balancement des jambes et des bras, genoux, rebond) | fin de `update` |
+
+Si on change les proportions du corps, mettre à jour `MODEL_HEIGHT` (hauteur
+du modèle tel qu'il est construit) : c'est lui qui permet à `height` de rester
+une vraie taille en mètres.
 
 Le bonhomme est le seul objet éclairé par de vraies lumières (ajoutées dans
 `view.ts`, à côté de `createCharacter`) : la chambre, elle, a ses lumières
