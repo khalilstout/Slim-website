@@ -121,6 +121,11 @@ export interface RoomView {
   ready: Promise<void>;
   /** Centre la caméra sur un objet, ou revient à la vue d'ensemble avec `null`. */
   focus(id: string | null): void;
+  /**
+   * Place occupée par le panneau, en pixels, à droite (ordinateur) ou en bas
+   * (téléphone). La chambre glisse pour rester centrée dans l'espace libre.
+   */
+  setInset(right: number, bottom: number): void;
 }
 
 export function createRoomView(
@@ -255,21 +260,49 @@ export function createRoomView(
   const goal = { target: HOME_TARGET.clone(), distance: baseDistance };
   controls.addEventListener('start', () => (animating = false));
 
+  // Le canevas garde toujours la taille de l'écran : quand le panneau s'ouvre,
+  // on ne le redimensionne pas (cela ferait clignoter l'image), on décale la vue.
+  const inset = { right: 0, bottom: 0 }; // place prise par le panneau, valeur visée
+  const shift = { x: 0, y: 0 }; // décalage affiché, qui rejoint la valeur visée en douceur
+  let started = false;
+
+  /** Distance à laquelle la chambre remplit l'espace laissé libre par le panneau. */
+  function frameRoom() {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const freeWidth = Math.max(width - inset.right, width * 0.3);
+    const freeHeight = Math.max(height - inset.bottom, height * 0.3);
+    const half = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    // Un peu plus serré en portrait.
+    const fitWidth = freeWidth < freeHeight ? FIT.widthPortrait : FIT.width;
+    baseDistance = Math.max(
+      (FIT.height * height) / (2 * half * freeHeight),
+      (fitWidth * height) / (2 * half * freeWidth),
+    );
+    controls.minDistance = baseDistance * 0.35;
+    controls.maxDistance = baseDistance * 1.15;
+    goal.distance = focused ? baseDistance * FOCUS_RATIO : baseDistance;
+    animating = true;
+  }
+
+  function applyShift() {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    if (Math.abs(shift.x) < 0.5 && Math.abs(shift.y) < 0.5) camera.clearViewOffset();
+    else camera.setViewOffset(width, height, shift.x, shift.y, width, height);
+  }
+
   function resize() {
     const width = container.clientWidth;
     const height = container.clientHeight;
     if (!width || !height) return;
     renderer.setSize(width, height);
     camera.aspect = width / height;
+    applyShift();
     camera.updateProjectionMatrix();
-    // Distance à laquelle la chambre remplit l'écran (un peu plus serré en portrait).
-    const half = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-    const fitWidth = camera.aspect < 1 ? FIT.widthPortrait : FIT.width;
-    baseDistance = Math.max(FIT.height / (2 * half), fitWidth / (2 * half * camera.aspect));
-    controls.minDistance = baseDistance * 0.35;
-    controls.maxDistance = baseDistance * 1.15;
-    goal.distance = focused ? baseDistance * FOCUS_RATIO : baseDistance;
-    animating = true;
+    frameRoom();
+    // Changer la taille efface le canevas : on redessine tout de suite pour ne jamais montrer une image vide.
+    if (started) renderer.render(scene, camera);
   }
   resize();
 
@@ -330,6 +363,17 @@ export function createRoomView(
     }
     controls.update();
 
+    // La vue glisse vers l'espace laissé libre par le panneau.
+    const targetX = inset.right / 2;
+    const targetY = inset.bottom / 2;
+    if (shift.x !== targetX || shift.y !== targetY) {
+      shift.x += (targetX - shift.x) * 0.12;
+      shift.y += (targetY - shift.y) * 0.12;
+      if (Math.abs(targetX - shift.x) < 0.5) shift.x = targetX;
+      if (Math.abs(targetY - shift.y) < 0.5) shift.y = targetY;
+      applyShift();
+    }
+
     for (const entry of entries) {
       // Surbrillance en fondu, avec une légère respiration quand elle est allumée.
       const pulse = entry.glowGoal ? 1 + 0.25 * Math.sin(now * 0.005) : 1;
@@ -348,10 +392,17 @@ export function createRoomView(
       entry.label.style.transform = `translate(-50%, -100%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     }
   }
+  started = true;
   requestAnimationFrame(frame);
 
   return {
     ready,
+    setInset(right, bottom) {
+      if (inset.right === right && inset.bottom === bottom) return;
+      inset.right = right;
+      inset.bottom = bottom;
+      frameRoom();
+    },
     focus(id) {
       focused = entries.find((e) => e.item.id === id) ?? null;
       goal.target.copy(focused ? focused.center : HOME_TARGET);

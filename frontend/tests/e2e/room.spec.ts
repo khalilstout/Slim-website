@@ -81,6 +81,24 @@ test.describe('chambre 3D', () => {
     await expect(page.locator('.label', { hasText: 'CDs' })).toHaveClass(/active/);
   });
 
+  test('ouvrir ou fermer le panneau ne redimensionne pas la 3D', async ({ page, browserName }) => {
+    // Redimensionner le canevas l'efface : l'image clignoterait à chaque ouverture ou fermeture.
+    await open(page);
+    if (!(await expect3D(page, browserName))) return;
+    const size = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelector<HTMLCanvasElement>('.view canvas')!;
+        return `${canvas.width}x${canvas.height} ${canvas.clientWidth}x${canvas.clientHeight}`;
+      });
+    const before = await size();
+    await page.getByRole('navigation').getByRole('button', { name: 'Merch' }).click();
+    await expect(panel(page)).toBeVisible();
+    expect(await size()).toBe(before);
+    await page.getByRole('button', { name: /Slim — retour/ }).click();
+    await expect(panel(page)).toBeHidden();
+    expect(await size()).toBe(before);
+  });
+
   test('la page ne déborde pas de l’écran', async ({ page }) => {
     await open(page, './#cd-stack');
     await expect(panel(page)).toBeVisible();

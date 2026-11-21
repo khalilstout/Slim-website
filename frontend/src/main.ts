@@ -207,6 +207,7 @@ function openPanel(content: PanelContent): number {
   panel.hidden = false;
   app.classList.add('panel-open');
   hint.hidden = true;
+  syncInset();
   return ++panelVersion;
 }
 
@@ -214,8 +215,18 @@ function closePanel() {
   panelVersion++;
   panel.hidden = true;
   app.classList.remove('panel-open');
+  syncInset();
   view?.focus(null);
   setSection('home');
+}
+
+/** Indique à la vue 3D la place que prend le panneau, pour qu'elle recentre la chambre à côté. */
+function syncInset() {
+  if (panel.hidden) return view?.setInset(0, 0);
+  const box = panel.getBoundingClientRect();
+  // Sur téléphone le panneau occupe toute la largeur, en bas ; sur ordinateur, une colonne à droite.
+  if (box.width >= window.innerWidth - 1) view?.setInset(0, window.innerHeight - box.top);
+  else view?.setInset(window.innerWidth - box.left, 0);
 }
 
 const message = (text: string) => h('p', { class: 'muted' }, text);
@@ -433,6 +444,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('hashchange', () => openLinked());
+window.addEventListener('resize', syncInset);
 
 // ----- Démarrage -----
 setSection('home');
@@ -453,6 +465,7 @@ function openLinked() {
 loadRoom()
   .then((room) => {
     view = createRoomView(viewEl, labelsEl, room, interactables, select);
+    syncInset();
     // L'indication n'apparaît qu'une fois l'animation d'arrivée terminée.
     void view.ready.then(() => (hint.hidden = !panel.hidden));
   })

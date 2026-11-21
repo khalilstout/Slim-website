@@ -80,6 +80,11 @@ ils changent, leur adresse change, et le navigateur ne ressert pas l'ancien.
 Les bulles sont des boutons HTML repositionnés à chaque image au-dessus de
 leur objet : elles restent nettes, cliquables et accessibles au clavier.
 
+Quand le panneau s'ouvre, la zone 3D **n'est pas redimensionnée** (cela
+efface l'image et la fait clignoter) : `main.ts` indique à la vue la place
+prise par le panneau (`view.setInset`), et la caméra décale la chambre en
+douceur vers l'espace libre.
+
 Si la 3D ne peut pas s'afficher (navigateur sans WebGL), l'interface reste
 utilisable : le menu ouvre les mêmes panneaux.
 

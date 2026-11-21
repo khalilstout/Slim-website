@@ -227,6 +227,7 @@ Fichier : `frontend/src/view.ts`, constantes en haut du fichier.
 | `FOCUS_RATIO` | Rapprochement quand un objet est sélectionné (plus petit = plus près). |
 | `HIGHLIGHT_OPACITY` | Force de la surbrillance d'un objet survolé. Sa couleur est dans `createRoomView` (`glow`). |
 | `controls.min…` / `controls.max…` | Jusqu'où l'utilisateur peut tourner et zoomer. |
+| Glissement de la chambre quand le panneau s'ouvre | Dans `frame()`, le `0.12` de « La vue glisse… » (plus grand = plus rapide). La place du panneau est mesurée par `syncInset` dans `main.ts`. |
 
 Il n'y a **aucune lumière** dans la scène : les ombres et les lumières sont
 peintes dans les textures (section 7). Pour changer l'éclairage, il faut
@@ -374,6 +375,7 @@ plus : vérifier alors si le correctif est encore nécessaire et le retirer.
 | --- | --- |
 | Page blanche sur http://localhost:8080 | Le front n'est pas compilé : `docker compose run --rm frontend-build`. |
 | « La chambre en 3D n'a pas pu s'afficher » | Le navigateur n'a pas de 3D (WebGL), ou un fichier de `src/assets/` manque : l'erreur précise est dans la console. Le menu reste utilisable. |
+| L'image clignote quand un panneau s'ouvre ou se ferme | Quelque chose redimensionne la zone 3D (`.stage` dans le CSS). Elle doit garder la taille de l'écran : voir `setInset` dans `view.ts`. |
 | Un objet ne réagit pas au clic | Ouvrir avec `?debug` : sa zone ne l'entoure plus, ou un autre meuble passe devant lui. |
 | La mauvaise chose s'éclaire au survol | Zone trop large : elle englobe les faces du voisin. |
 | La boutique locale affiche les produits fictifs | La page ne reçoit pas sa configuration : vérifier que le code source de la page contient `data-slimroom="…"`. |
