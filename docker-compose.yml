@@ -52,7 +52,7 @@ services:
 
   # Compile le front avant le démarrage de la boutique.
   frontend-build:
-    image: node:22-alpine
+    image: node:26-alpine
     working_dir: /app
     command: sh -c "npm ci --no-audit --no-fund && npm run build"
     volumes:
@@ -61,7 +61,7 @@ services:
   # Serveur de développement du front seul (rechargement à chaud, données de démo).
   frontend:
     profiles: [front]
-    image: node:22-alpine
+    image: node:26-alpine
     working_dir: /app
     command: sh -c "npm install --no-audit --no-fund && npm run dev"
     ports:
