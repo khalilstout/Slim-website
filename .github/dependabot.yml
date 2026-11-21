@@ -1,6 +1,5 @@
 # Dependabot ouvre chaque semaine des pull requests de mise à jour ; la CI les
-# teste comme n'importe quelle autre. Il ouvre aussi, hors calendrier, une pull
-# request dès qu'une faille est publiée sur une dépendance.
+# teste comme n'importe quelle autre.
 version: 2
 updates:
   - package-ecosystem: npm
