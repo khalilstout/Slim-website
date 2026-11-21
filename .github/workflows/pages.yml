@@ -17,16 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # Deux jobs, comme dans le modèle officiel de GitHub : l'archive du site n'est
+  # visible par l'étape de déploiement qu'une fois le job qui l'a créée terminé.
+  build:
+    name: Contrôles et build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read # l'étape de déploiement doit retrouver l'archive du site produite juste avant
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,5 +41,17 @@ jobs:
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: frontend/dist
+
+  deploy:
+    name: Publication
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
