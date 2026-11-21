@@ -32,6 +32,7 @@ Vite + TypeScript + three.js, sans framework d'interface.
 | `src/main.ts` | L'interface : barre du haut, panneau (rayon, texte, vidéo, panier), notification, écran de chargement. |
 | `src/view.ts` | La vue 3D : rendu, caméra, clic et survol des objets, bulles, animation d'arrivée, décor autour de la chambre. |
 | `src/room.ts` | La chambre : charge le modèle Blender et lui applique ses textures. |
+| `src/character.ts` | Le petit bonhomme : ses formes, sa marche vers l'objet ouvert. |
 | `src/zones.ts` | Les calculs sur les zones cliquables (un point est-il dans une boîte ?). Sans dépendance, donc facile à tester. |
 | `src/shop.ts` | L'accès à la boutique, derrière l'interface `Shop`. |
 | `src/style.css` | Tous les styles. |
@@ -79,6 +80,11 @@ ils changent, leur adresse change, et le navigateur ne ressert pas l'ancien.
 
 Les bulles sont des boutons HTML repositionnés à chaque image au-dessus de
 leur objet : elles restent nettes, cliquables et accessibles au clavier.
+
+Quand le panneau s'ouvre, la zone 3D **n'est pas redimensionnée** (cela
+efface l'image et la fait clignoter) : `main.ts` indique à la vue la place
+prise par le panneau (`view.setInset`), et la caméra décale la chambre en
+douceur vers l'espace libre.
 
 Si la 3D ne peut pas s'afficher (navigateur sans WebGL), l'interface reste
 utilisable : le menu ouvre les mêmes panneaux.

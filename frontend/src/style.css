@@ -213,14 +213,11 @@ a:focus-visible,
 }
 
 /* ----- Scène ----- */
+/* La scène garde toujours la taille de l'écran : quand le panneau s'ouvre, c'est
+   la vue 3D qui décale la chambre (view.ts, setInset), sans rien redimensionner. */
 .stage {
   position: fixed;
   inset: 0;
-  transition: right 0.35s ease, bottom 0.35s ease;
-}
-
-.panel-open .stage {
-  right: var(--panel);
 }
 
 .view,
@@ -788,10 +785,6 @@ a:focus-visible,
   .panel {
     animation: none;
   }
-
-  .stage {
-    transition: none;
-  }
 }
 
 /* ----- Téléphone : le panneau devient un volet en bas ----- */
@@ -858,11 +851,6 @@ a:focus-visible,
 
   .panel-head h2 {
     font-size: 24px;
-  }
-
-  .panel-open .stage {
-    right: 0;
-    bottom: 54dvh;
   }
 
   /* La notification passe au-dessus du volet. */

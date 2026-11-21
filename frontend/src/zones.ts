@@ -46,6 +46,24 @@ export function zoneIsValid(zone: Zone): boolean {
   return zone.min.every((value, axis) => Number.isFinite(value) && value < zone.max[axis]);
 }
 
+/** Rectangle du sol : [x mini, z mini] et [x maxi, z maxi]. */
+export interface FloorArea {
+  min: [number, number];
+  max: [number, number];
+}
+
+/**
+ * Où se placer, dans un rectangle de sol, pour être au plus près d'une zone :
+ * le point du rectangle le plus proche du centre de la zone.
+ */
+export function standPoint(zone: Zone, area: FloorArea): [number, number] {
+  const [x, , z] = zoneCenter(zone);
+  return [
+    Math.min(area.max[0], Math.max(area.min[0], x)),
+    Math.min(area.max[1], Math.max(area.min[1], z)),
+  ];
+}
+
 /**
  * L'élément dont la zone contient le point. Si plusieurs zones se chevauchent,
  * la plus petite gagne : un objet posé sur un meuble reste cliquable.

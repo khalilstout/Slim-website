@@ -26,6 +26,7 @@ unitaires). Voir [tests-et-ci.md](tests-et-ci.md).
 6. [Caméra et surbrillance](#6-caméra-et-surbrillance)
 7. [La chambre : modèle Blender et textures](#7-la-chambre--modèle-blender-et-textures)
 8. [Nouveau type de panneau](#8-nouveau-type-de-panneau)
+   (et [le petit bonhomme](#le-petit-bonhomme), en fin de section 7)
 9. [Données venant de PrestaShop](#9-données-venant-de-prestashop)
 10. [Versions et dépendances](#10-versions-et-dépendances)
 11. [En cas de problème](#11-en-cas-de-problème)
@@ -227,6 +228,7 @@ Fichier : `frontend/src/view.ts`, constantes en haut du fichier.
 | `FOCUS_RATIO` | Rapprochement quand un objet est sélectionné (plus petit = plus près). |
 | `HIGHLIGHT_OPACITY` | Force de la surbrillance d'un objet survolé. Sa couleur est dans `createRoomView` (`glow`). |
 | `controls.min…` / `controls.max…` | Jusqu'où l'utilisateur peut tourner et zoomer. |
+| Glissement de la chambre quand le panneau s'ouvre | Dans `frame()`, le `0.12` de « La vue glisse… » (plus grand = plus rapide). La place du panneau est mesurée par `syncInset` dans `main.ts`. |
 
 Il n'y a **aucune lumière** dans la scène : les ombres et les lumières sont
 peintes dans les textures (section 7). Pour changer l'éclairage, il faut
@@ -292,6 +294,48 @@ et supprimer `remapMainPosters` ainsi que `mainPosters`.
 mettre une image fixe : charger la texture comme les autres et l'associer à
 `screen_mat`. `Ressources/bundle_001/textures/uv_checker_1024.png` est une
 mire de test, pratique pour vérifier l'orientation.
+
+### Le petit bonhomme
+
+Il n'y a pas de fichier 3D : il est construit en formes simples dans
+`frontend/src/character.ts`, d'après la planche `Ressources/imageh.png`.
+
+Réglages courants : `frontend/src/config.ts`, objet `character`.
+
+| Réglage | Effet |
+| --- | --- |
+| `enabled` | `false` le retire de la chambre. |
+| `height` | Sa taille en mètres. |
+| `speed` | Sa vitesse de marche. |
+| `start`, `startFacing` | Où il attend à l'ouverture de la page, et vers où il regarde. |
+| `walkArea` | Le rectangle de sol où il a le droit de marcher. |
+
+Comment il se déplace : quand on ouvre un objet, il marche **en ligne droite**
+jusqu'au point de `walkArea` le plus proche de cet objet, puis se tourne vers
+lui. Il n'y a volontairement aucun calcul de chemin : comme `walkArea` est un
+rectangle sans meuble dedans, une ligne droite entre deux de ses points ne
+traverse jamais rien. Avec `?debug`, ce rectangle s'affiche en orange.
+
+Si un meuble est ajouté sur le tapis, réduire `walkArea` pour l'exclure. Les
+tests refusent une zone de marche qui ferait s'arrêter le bonhomme à
+l'intérieur d'un objet cliquable.
+
+Pour changer son apparence, dans `character.ts` :
+
+| Élément | Où |
+| --- | --- |
+| Couleurs (peau, cheveux, casquette, t-shirt…) | `COLORS`, en haut du fichier |
+| Visage, fleur du t-shirt | `drawFace`, `drawFlower` (dessinés au trait, comme sur un calque) |
+| Formes du corps, de la tête, de la casquette | `createCharacter`, une ligne `mesh(...)` par forme |
+| Balancement des jambes et des bras, sautillement, hélice | fin de `update` |
+
+Le bonhomme est le seul objet éclairé par de vraies lumières (ajoutées dans
+`view.ts`, à côté de `createCharacter`) : la chambre, elle, a ses lumières
+peintes dans sa texture.
+
+Pour le remplacer un jour par un vrai modèle animé fait dans Blender : charger
+le `.glb` dans `createCharacter` à la place des formes, et garder les deux
+fonctions `walkTo` et `update` ; le reste du site n'a pas à changer.
 
 ### Poids
 
@@ -374,6 +418,7 @@ plus : vérifier alors si le correctif est encore nécessaire et le retirer.
 | --- | --- |
 | Page blanche sur http://localhost:8080 | Le front n'est pas compilé : `docker compose run --rm frontend-build`. |
 | « La chambre en 3D n'a pas pu s'afficher » | Le navigateur n'a pas de 3D (WebGL), ou un fichier de `src/assets/` manque : l'erreur précise est dans la console. Le menu reste utilisable. |
+| L'image clignote quand un panneau s'ouvre ou se ferme | Quelque chose redimensionne la zone 3D (`.stage` dans le CSS). Elle doit garder la taille de l'écran : voir `setInset` dans `view.ts`. |
 | Un objet ne réagit pas au clic | Ouvrir avec `?debug` : sa zone ne l'entoure plus, ou un autre meuble passe devant lui. |
 | La mauvaise chose s'éclaire au survol | Zone trop large : elle englobe les faces du voisin. |
 | La boutique locale affiche les produits fictifs | La page ne reçoit pas sa configuration : vérifier que le code source de la page contient `data-slimroom="…"`. |
