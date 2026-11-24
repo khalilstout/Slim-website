@@ -18,3 +18,6 @@ RUN sed -i 's|rm -r /var/www/html/\$PS_FOLDER_INSTALL/|rm -rf /var/www/html/$PS_
 COPY --chown=www-data:www-data prestashop/modules/slimroom /var/www/html/modules/slimroom
 COPY --chown=www-data:www-data --from=frontend /app/dist /var/www/html/modules/slimroom/views/dist
 COPY --chmod=755 prestashop/post-install /tmp/post-install-scripts
+# Filet de sécurité pour un checkout Windows resté en CRLF : un « \r » en fin de
+# ligne rend le script inexécutable (« not found », code 127).
+RUN sed -i 's/\r$//' /tmp/post-install-scripts/*.sh

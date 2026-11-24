@@ -1,0 +1,9 @@
+# Fins de ligne Unix (LF) pour tous les fichiers texte, même sur un checkout Windows.
+# Sans ça, Git pour Windows convertit en CRLF : le script post-installation devient
+# « #!/bin/sh\r », introuvable dans le conteneur Linux (erreur 127, module non installé).
+* text=auto eol=lf
+
+*.blend binary
+*.glb binary
+*.png binary
+*.jpg binary

@@ -43,6 +43,26 @@ Commandes utiles :
 | `python3 tests/integration/smoke.py` | Vérifie la boutique locale de bout en bout (page, API, panier). |
 | `docker compose down -v` | Efface tout (base comprise) pour repartir d'une installation neuve. |
 
+### Si la boutique affiche le thème PrestaShop par défaut au lieu de la chambre
+
+Le module `slimroom` ne s'est pas installé. Dans les journaux, on voit
+`10-install-slimroom.sh: not found` puis `prestashop-1 exited with code 127`.
+
+La cause habituelle est un clone fait sous Windows avant l'ajout de
+`.gitattributes`. Git avait converti les fins de ligne en CRLF, et un script
+`.sh` en CRLF ne s'exécute pas dans un conteneur Linux. Le dépôt force maintenant
+les fins de ligne LF, et l'image enlève les CRLF restants. Pour réparer :
+
+```sh
+git pull
+git rm -r --cached -q . && git reset --hard   # réécrit les fichiers en LF (efface les modifs non commitées)
+docker compose down -v                          # l'installation ratée est gardée dans les volumes
+docker compose up --build
+```
+
+Le `down -v` est indispensable : PrestaShop ne lance son installation (et le
+script du module) qu'au premier démarrage, sur des volumes vides.
+
 ## Organisation du dépôt
 
 | Chemin | Contenu |
