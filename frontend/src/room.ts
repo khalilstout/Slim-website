@@ -12,8 +12,6 @@ import { mainPosters } from './config';
 
 export interface Room {
   object: THREE.Group;
-  /** Texture principale de la chambre (sert à accorder les murs ajoutés en vue intérieure). */
-  texture: THREE.Texture;
   /** À appeler à chaque image : anime l'écran de l'ordinateur. */
   update(now: number): void;
 }
@@ -118,5 +116,5 @@ export async function loadRoom(): Promise<Room> {
     mesh.material = material;
   });
 
-  return { object: gltf.scene, texture: roomTexture, update: screen.draw };
+  return { object: gltf.scene, update: screen.draw };
 }

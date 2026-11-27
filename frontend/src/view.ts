@@ -1,20 +1,12 @@
 // Vue 3D : rendu, caméra, survol / clic sur les objets, bulles, animation d'arrivée.
-// Deux façons de regarder la chambre, choisies à la création (`mode`) :
-// - 'outside' : vue d'ensemble, de l'extérieur, qu'on fait tourner (page d'accueil) ;
-// - 'inside'  : on est dans la pièce, à hauteur d'yeux (page dedans.html).
-// Le clic, la surbrillance, les bulles et le bonhomme sont communs aux deux.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createCharacter } from './character';
-import { ambiance, character as characterSettings, insideView, type Interactable } from './config';
-import { createEnclosure } from './enclosure';
+import { ambiance, character as characterSettings, type Interactable } from './config';
 import type { Room } from './room';
 import { standPoint, zoneAt, zoneCenter, zoneContains } from './zones';
 
-export type ViewMode = 'outside' | 'inside';
-
-// ----- Réglages de la vue d'ensemble -----
 const FOV = 36;
 const HOME_TARGET = new THREE.Vector3(0, 0.9, 0);
 // Direction de la caméra au repos : dans l'angle ouvert de la chambre, un peu au-dessus.
@@ -23,13 +15,9 @@ const HOME_POLAR = 1.08;
 /** Taille de la chambre à faire tenir à l'écran (largeur vue de l'angle, hauteur). */
 const FIT = { width: 8.6, widthPortrait: 7.7, height: 7.1 };
 const FOCUS_RATIO = 0.66; // distance caméra quand un objet est sélectionné, par rapport à la vue d'ensemble
-
-// ----- Réglages communs -----
 const INTRO_HEIGHT = 6; // hauteur d'où descend la chambre à l'arrivée
 const INTRO_DARK = 0.12; // luminosité de la chambre au début de l'arrivée (elle « s'allume »)
 const HIGHLIGHT_OPACITY = 0.28;
-/** Espace où la caméra intérieure a le droit de se placer (un peu en retrait des murs). */
-const INSIDE_BOUNDS = { minX: -2.3, maxX: 2.1, minZ: -2.1, maxZ: 2.35 };
 
 interface Entry {
   item: Interactable;
@@ -41,12 +29,8 @@ interface Entry {
   label: HTMLButtonElement | null;
 }
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const clamp01 = (value: number) => clamp(value, 0, 1);
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-/** Angle le plus court pour aller de `from` à `to` (radians). */
-const shortestTurn = (from: number, to: number) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
 
 /** Texture ronde et douce, pour les particules et le halo. */
 function glowTexture(inner: string, outer: string): THREE.CanvasTexture {
@@ -133,49 +117,10 @@ function collectFaces(room: THREE.Object3D, items: Interactable[]): Map<string, 
   return faces;
 }
 
-/**
- * Vue intérieure : d'où regarder un objet. On se place à hauteur d'yeux, à côté
- * de l'endroit où le bonhomme vient se poster (`stand`), du côté qui laisse la
- * vue la plus dégagée. `item.viewFrom` permet d'imposer la place.
- */
-function insideViewpoint(item: Interactable, center: THREE.Vector3, stand: [number, number]): THREE.Vector3 {
-  if (item.viewFrom) return new THREE.Vector3(...item.viewFrom);
-  const { min, max } = item.zone;
-  const size = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-  const distance = clamp(size * 0.9 + 1.1, 1.5, 2.8);
-  const standPosition = new THREE.Vector3(stand[0], center.y, stand[1]);
-  const towardStand = standPosition.clone().sub(center).setY(0);
-  if (towardStand.lengthSq() < 0.01) towardStand.set(-center.x, 0, 0.3 - center.z);
-  towardStand.normalize();
-  const up = new THREE.Vector3(0, 1, 0);
-  let best = new THREE.Vector3();
-  let bestScore = -Infinity;
-  for (const side of [-1, 1]) {
-    // De biais par rapport au bonhomme, pour qu'il ne bouche pas la vue.
-    const point = center.clone().addScaledVector(towardStand.clone().applyAxisAngle(up, side * 0.8), distance);
-    point.x = clamp(point.x, INSIDE_BOUNDS.minX, INSIDE_BOUNDS.maxX);
-    point.z = clamp(point.z, INSIDE_BOUNDS.minZ, INSIDE_BOUNDS.maxZ);
-    point.y = center.y;
-    // On préfère le côté le plus éloigné du bonhomme et le plus loin de l'objet (donc le moins collé à un mur).
-    const score = point.distanceTo(standPosition) + point.distanceTo(center);
-    if (score > bestScore) {
-      bestScore = score;
-      best = point;
-    }
-  }
-  best.y = clamp(center.y + 0.35, 1.15, 1.65);
-  return best;
-}
-
 export interface RoomView {
   /** Résolue quand l'animation d'arrivée est terminée. */
   ready: Promise<void>;
-  /**
-   * Vue intérieure : fait entrer la caméra dans la pièce (elle attend dehors,
-   * devant l'écran d'entrée). Sans effet si c'est déjà fait, ou en vue d'ensemble.
-   */
-  enter(): void;
-  /** Centre la caméra sur un objet, ou revient à la vue de départ avec `null`. */
+  /** Centre la caméra sur un objet, ou revient à la vue d'ensemble avec `null`. */
   focus(id: string | null): void;
   /**
    * Place occupée par le panneau, en pixels, à droite (ordinateur) ou en bas
@@ -190,11 +135,9 @@ export function createRoomView(
   room: Room,
   interactables: Interactable[],
   onSelect: (id: string) => void,
-  mode: ViewMode = 'outside',
   /** Modèle du bonhomme (voir character.ts) ; `null` = pas de bonhomme. */
   characterModel: THREE.Object3D | null = null,
 ): RoomView {
-  const inside = mode === 'inside';
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   // Les couleurs viennent telles quelles des textures peintes dans Blender.
@@ -208,28 +151,8 @@ export function createRoomView(
   scene.add(stage);
   const dust = buildAmbiance(scene);
 
-  const roomMaterials = new Set<THREE.MeshBasicMaterial>();
-  room.object.traverse((node) => {
-    const mesh = node as THREE.Mesh;
-    if (mesh.isMesh) roomMaterials.add(mesh.material as THREE.MeshBasicMaterial);
-  });
-  let ceilingLamp: THREE.Object3D | null = null;
-  if (inside) {
-    // De l'intérieur, il faut une pièce fermée : murs manquants, plafond, porte.
-    const enclosure = createEnclosure(room.texture);
-    stage.add(enclosure.object);
-    ceilingLamp = enclosure.lamp;
-    enclosure.materials.forEach((material) => roomMaterials.add(material));
-  }
-  const setBrightness = (value: number) => roomMaterials.forEach((material) => material.color.setScalar(value));
-
   // Le bonhomme est le seul objet éclairé de la scène (la chambre a ses lumières peintes).
-  const insideStart = insideView.characterStart;
-  const character = !characterModel
-    ? null
-    : inside
-      ? createCharacter(characterModel, insideStart, Math.atan2(insideView.eye[0] - insideStart[0], insideView.eye[2] - insideStart[1]))
-      : createCharacter(characterModel);
+  const character = characterModel ? createCharacter(characterModel) : null;
   if (character) {
     stage.add(character.object);
     scene.add(new THREE.HemisphereLight(0xfff3e6, 0xa8684a, 2.1));
@@ -238,23 +161,26 @@ export function createRoomView(
     scene.add(windowLight);
   }
 
-  const camera = new THREE.PerspectiveCamera(inside ? insideView.fov : FOV, 1, 0.05, 100);
-  camera.rotation.order = 'YXZ'; // tourner la tête (Y) puis lever les yeux (X)
+  const roomMaterials = new Set<THREE.MeshBasicMaterial>();
+  room.object.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (mesh.isMesh) roomMaterials.add(mesh.material as THREE.MeshBasicMaterial);
+  });
+  const setBrightness = (value: number) => roomMaterials.forEach((material) => material.color.setScalar(value));
+
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 100);
   const homeDirection = new THREE.Vector3().setFromSphericalCoords(1, HOME_POLAR, HOME_AZIMUTH);
 
-  // Vue d'ensemble : la caméra tourne autour de la chambre.
-  const controls = inside ? null : new OrbitControls(camera, renderer.domElement);
-  if (controls) {
-    controls.target.copy(HOME_TARGET);
-    controls.enablePan = false;
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.rotateSpeed = 0.6;
-    controls.minAzimuthAngle = HOME_AZIMUTH - 0.55;
-    controls.maxAzimuthAngle = HOME_AZIMUTH + 0.55;
-    controls.minPolarAngle = 0.75;
-    controls.maxPolarAngle = 1.42;
-  }
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.copy(HOME_TARGET);
+  controls.enablePan = false;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.rotateSpeed = 0.6;
+  controls.minAzimuthAngle = HOME_AZIMUTH - 0.55;
+  controls.maxAzimuthAngle = HOME_AZIMUTH + 0.55;
+  controls.minPolarAngle = 0.75;
+  controls.maxPolarAngle = 1.42;
 
   // ----- Objets cliquables -----
   room.object.updateMatrixWorld(true);
@@ -330,78 +256,16 @@ export function createRoomView(
     return zoneAt(entries.map((entry) => ({ entry, zone: entry.item.zone })), hit.point)?.entry ?? null;
   }
 
-  // ----- Vue intérieure : position et direction du regard -----
-  const homeEye = new THREE.Vector3(...insideView.eye);
-  const homeLook = new THREE.Vector3(...insideView.lookAt);
-  const look = {
-    eye: homeEye.clone(), // où la caméra doit se trouver
-    target: homeLook.clone(), // ce qu'elle doit regarder
-    turn: 0, // la tête tournée par le visiteur, à gauche ou à droite
-    tilt: 0, // … et vers le haut ou le bas
-    edgeX: 0, // souris contre un bord de l'écran : -1 à gauche, 1 à droite
-    edgeY: 0,
-  };
-  let yaw = 0; // direction actuelle de la caméra, qui rejoint en douceur celle visée
-  let pitch = 0;
-  const lookDirection = new THREE.Vector3();
-  function aimedAngles(): [number, number] {
-    lookDirection.copy(look.target).sub(look.eye);
-    const baseYaw = Math.atan2(-lookDirection.x, -lookDirection.z);
-    const basePitch = Math.atan2(lookDirection.y, Math.hypot(lookDirection.x, lookDirection.z));
-    return [baseYaw + look.turn, clamp(basePitch + look.tilt, -1.2, 1.2)];
-  }
-  function limitLook() {
-    // Devant un objet, on ne peut que jeter un œil autour ; depuis la place d'arrivée, on peut presque se retourner.
-    const maxTurn = focused ? 0.6 : insideView.maxTurn;
-    const maxTilt = focused ? 0.35 : insideView.maxTilt;
-    look.turn = clamp(look.turn, -maxTurn, maxTurn);
-    look.tilt = clamp(look.tilt, -maxTilt, maxTilt);
-  }
-
   let focused: Entry | null = null;
   let down: { x: number; y: number } | null = null;
-  let dragging = false;
   const canvas = renderer.domElement;
-  canvas.addEventListener('pointerdown', (e) => {
-    down = { x: e.clientX, y: e.clientY };
-    dragging = false;
-    if (inside) canvas.setPointerCapture(e.pointerId);
-  });
+  canvas.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY }));
   canvas.addEventListener('pointermove', (e) => {
-    if (inside && down && e.buttons) {
-      // Glisser pour regarder autour : on « tire » le décor, comme sur une carte.
-      dragging ||= Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8;
-      if (dragging) {
-        const speed = (insideView.dragSpeed * camera.fov * Math.PI) / 180 / canvas.clientHeight;
-        look.turn += e.movementX * speed;
-        look.tilt += e.movementY * speed;
-        limitLook();
-      }
-      look.edgeX = look.edgeY = 0;
-      return;
-    }
-    if (e.pointerType !== 'mouse' || e.buttons || intro) return;
-    highlight(pick(e) ?? focused);
-    if (inside) {
-      // La souris près d'un bord fait tourner le regard de ce côté.
-      const rect = canvas.getBoundingClientRect();
-      const edge = (position: number, size: number) => {
-        const margin = 0.12;
-        const ratio = position / size;
-        if (ratio < margin) return -(1 - ratio / margin);
-        if (ratio > 1 - margin) return (ratio - (1 - margin)) / margin;
-        return 0;
-      };
-      look.edgeX = edge(e.clientX - rect.left, rect.width);
-      look.edgeY = edge(e.clientY - rect.top, rect.height);
-    }
+    if (e.pointerType === 'mouse' && !e.buttons && !intro) highlight(pick(e) ?? focused);
   });
-  canvas.addEventListener('pointerleave', () => {
-    highlight(focused);
-    look.edgeX = look.edgeY = 0;
-  });
+  canvas.addEventListener('pointerleave', () => highlight(focused));
   canvas.addEventListener('pointerup', (e) => {
-    // Un glissement fait tourner la vue ; seul un vrai clic sélectionne.
+    // Un glissement fait tourner la caméra ; seul un vrai clic sélectionne.
     const moved = down ? Math.hypot(e.clientX - down.x, e.clientY - down.y) : Infinity;
     down = null;
     if (moved > 8 || intro) return;
@@ -413,18 +277,16 @@ export function createRoomView(
   let baseDistance = 10;
   let animating = false;
   const goal = { target: HOME_TARGET.clone(), distance: baseDistance };
-  controls?.addEventListener('start', () => (animating = false));
+  controls.addEventListener('start', () => (animating = false));
 
   // Le canevas garde toujours la taille de l'écran : quand le panneau s'ouvre,
   // on ne le redimensionne pas (cela ferait clignoter l'image), on décale la vue.
   const inset = { right: 0, bottom: 0 }; // place prise par le panneau, valeur visée
   const shift = { x: 0, y: 0 }; // décalage affiché, qui rejoint la valeur visée en douceur
   let started = false;
-  let arrived = false; // l'animation d'arrivée est terminée
 
-  /** Vue d'ensemble : distance à laquelle la chambre remplit l'espace laissé libre par le panneau. */
+  /** Distance à laquelle la chambre remplit l'espace laissé libre par le panneau. */
   function frameRoom() {
-    if (!controls) return;
     const width = container.clientWidth;
     const height = container.clientHeight;
     const freeWidth = Math.max(width - inset.right, width * 0.3);
@@ -455,7 +317,6 @@ export function createRoomView(
     if (!width || !height) return;
     renderer.setSize(width, height);
     camera.aspect = width / height;
-    if (inside && arrived) camera.fov = width < height ? insideView.fovPortrait : insideView.fov;
     applyShift();
     camera.updateProjectionMatrix();
     frameRoom();
@@ -465,98 +326,35 @@ export function createRoomView(
   resize();
 
   // ----- Animation d'arrivée : la chambre descend en tournant, puis s'allume -----
-  // En vue intérieure, la caméra regarde d'abord la chambre du dehors, puis y entre.
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let intro = ambiance.intro && !reducedMotion;
   let introStart = 0;
   let markReady: () => void = () => undefined;
   const ready = new Promise<void>((resolve) => (markReady = resolve));
-  // Écran d'entrée de la vue intérieure : la chambre vue du dehors, cadrée un peu
-  // haut pour laisser la place du titre et du bouton en bas de l'écran.
-  const GATE_TARGET = new THREE.Vector3(0, 0.15, 0);
-  const outsidePosition = new THREE.Vector3();
-  const outsideLook = new THREE.PerspectiveCamera(); // sert seulement à calculer une orientation de caméra
-  outsideLook.rotation.order = 'YXZ';
-  function frameOutside(sway: number) {
-    const aspect = container.clientWidth / container.clientHeight;
-    const half = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-    const fitWidth = aspect < 1 ? FIT.widthPortrait : FIT.width;
-    const distance = Math.max((FIT.height * 1.15) / (2 * half), (fitWidth * 1.08) / (2 * half * aspect));
-    outsidePosition.copy(homeDirection).applyAxisAngle(THREE.Object3D.DEFAULT_UP, sway).multiplyScalar(distance).add(GATE_TARGET);
-    outsideLook.position.copy(outsidePosition);
-    outsideLook.lookAt(GATE_TARGET);
-  }
-  frameOutside(0);
-  const ENTER_DURATION = 1700; // durée de la plongée dans la pièce, en millisecondes
-  let entering = false; // vue intérieure : le visiteur a demandé à entrer
-  let enterStart = 0;
-
-  function placeInside() {
-    camera.position.copy(look.eye);
-    [yaw, pitch] = aimedAngles();
-    camera.rotation.set(pitch, yaw, 0);
-    camera.fov = container.clientWidth < container.clientHeight ? insideView.fovPortrait : insideView.fov;
-    camera.updateProjectionMatrix();
-  }
   function endIntro() {
     intro = false;
-    arrived = true;
     stage.position.y = 0;
     stage.rotation.y = 0;
     setBrightness(1);
-    if (controls) controls.enabled = true;
-    else placeInside();
-    if (ceilingLamp) ceilingLamp.visible = true;
+    controls.enabled = true;
     labelLayer.classList.add('ready');
     markReady();
   }
   function playIntro(now: number) {
     introStart ||= now;
-    // 1. La chambre descend en tournant et s'allume (rien à attendre si les animations sont réduites).
-    const settle = reducedMotion || !ambiance.intro ? 1 : clamp01((now - introStart) / (ambiance.introDuration * 1000));
-    const drop = easeOutCubic(clamp01(settle / 0.75));
+    const t = clamp01((now - introStart) / (ambiance.introDuration * 1000));
+    const drop = easeOutCubic(clamp01(t / 0.75));
     stage.position.y = (1 - drop) * INTRO_HEIGHT;
     stage.rotation.y = (1 - drop) * -Math.PI * 1.5;
-    setBrightness(INTRO_DARK + (1 - INTRO_DARK) * easeOutCubic(clamp01((settle - 0.35) / 0.65)));
-    if (!inside) {
-      if (settle >= 1) endIntro();
-      return;
-    }
-    // 2. Vue intérieure : la caméra reste dehors, en léger balancement, jusqu'à ce que le visiteur entre…
-    frameOutside(reducedMotion ? 0 : Math.sin(now * 0.0004) * 0.06);
-    camera.position.copy(outsidePosition);
-    camera.rotation.copy(outsideLook.rotation);
-    if (!entering || settle < 1) return;
-    // 3. … puis elle plonge jusqu'à sa place dans la pièce.
-    enterStart ||= now;
-    const enter = reducedMotion ? 1 : easeInOut(clamp01((now - enterStart) / ENTER_DURATION));
-    const [aimYaw, aimPitch] = aimedAngles();
-    camera.position.lerp(look.eye, enter);
-    yaw = outsideLook.rotation.y + shortestTurn(outsideLook.rotation.y, aimYaw) * enter;
-    pitch = outsideLook.rotation.x + (aimPitch - outsideLook.rotation.x) * enter;
-    camera.rotation.set(pitch, yaw, 0);
-    camera.fov = FOV + ((container.clientWidth < container.clientHeight ? insideView.fovPortrait : insideView.fov) - FOV) * enter;
-    camera.updateProjectionMatrix();
-    if (ceilingLamp) ceilingLamp.visible = enter > 0.6;
-    if (enter >= 1) endIntro();
+    // La lumière monte sur la fin de la descente.
+    setBrightness(INTRO_DARK + (1 - INTRO_DARK) * easeOutCubic(clamp01((t - 0.35) / 0.65)));
+    if (t >= 1) endIntro();
   }
-  if (inside) {
-    // La vue intérieure commence toujours dehors, devant l'écran d'entrée.
-    intro = true;
-    camera.fov = FOV;
-    camera.updateProjectionMatrix();
-    camera.position.copy(outsidePosition);
-    camera.rotation.copy(outsideLook.rotation);
-    if (ceilingLamp) ceilingLamp.visible = false;
-  } else {
-    camera.position.copy(HOME_TARGET).addScaledVector(homeDirection, baseDistance * (intro ? 1.5 : 1));
-  }
+  camera.position.copy(HOME_TARGET).addScaledVector(homeDirection, baseDistance * (intro ? 1.5 : 1));
   if (intro) {
-    if (controls) controls.enabled = false;
-    if (!reducedMotion && ambiance.intro) {
-      stage.position.y = INTRO_HEIGHT;
-      setBrightness(INTRO_DARK);
-    }
+    controls.enabled = false;
+    stage.position.y = INTRO_HEIGHT;
+    setBrightness(INTRO_DARK);
   } else {
     endIntro();
   }
@@ -564,8 +362,6 @@ export function createRoomView(
 
   const projected = new THREE.Vector3();
   const offset = new THREE.Vector3();
-  const toAnchor = new THREE.Vector3();
-  const forward = new THREE.Vector3();
   let previous = 0;
   function frame(now: number) {
     requestAnimationFrame(frame);
@@ -577,33 +373,19 @@ export function createRoomView(
     character?.update(dt);
     dust.rotation.y = now * 0.00002;
     dust.position.y = Math.sin(now * 0.0003) * 0.35;
-
-    if (controls) {
-      const ease = intro ? 0.03 : 0.08; // la caméra s'approche plus lentement pendant l'arrivée
-      if (animating) {
-        // On glisse vers la cible en gardant l'angle de vue courant.
-        offset.copy(camera.position).sub(controls.target);
-        const distance = offset.length();
-        const nextDistance = distance + (goal.distance - distance) * ease;
-        controls.target.lerp(goal.target, ease);
-        camera.position.copy(controls.target).addScaledVector(offset.normalize(), nextDistance);
-        if (controls.target.distanceToSquared(goal.target) < 1e-6 && Math.abs(goal.distance - nextDistance) < 1e-3) {
-          animating = false;
-        }
+    const ease = intro ? 0.03 : 0.08; // la caméra s'approche plus lentement pendant l'arrivée
+    if (animating) {
+      // On glisse vers la cible en gardant l'angle de vue courant.
+      offset.copy(camera.position).sub(controls.target);
+      const distance = offset.length();
+      const nextDistance = distance + (goal.distance - distance) * ease;
+      controls.target.lerp(goal.target, ease);
+      camera.position.copy(controls.target).addScaledVector(offset.normalize(), nextDistance);
+      if (controls.target.distanceToSquared(goal.target) < 1e-6 && Math.abs(goal.distance - nextDistance) < 1e-3) {
+        animating = false;
       }
-      controls.update();
-    } else if (!intro) {
-      // Vue intérieure : la caméra rejoint en douceur sa place et la direction visée.
-      look.turn -= look.edgeX * insideView.edgeSpeed * dt;
-      look.tilt -= look.edgeY * insideView.edgeSpeed * 0.6 * dt;
-      limitLook();
-      const [aimYaw, aimPitch] = aimedAngles();
-      const ease = 1 - Math.exp(-dt * 6); // amorti : le regard rejoint sa cible sans à-coup
-      camera.position.lerp(look.eye, ease);
-      yaw += shortestTurn(yaw, aimYaw) * ease;
-      pitch += (aimPitch - pitch) * ease;
-      camera.rotation.set(pitch, yaw, 0);
     }
+    controls.update();
 
     // La vue glisse vers l'espace laissé libre par le panneau.
     const targetX = inset.right / 2;
@@ -626,13 +408,8 @@ export function createRoomView(
 
     const width = container.clientWidth;
     const height = container.clientHeight;
-    camera.getWorldDirection(forward);
     for (const entry of entries) {
       if (!entry.label) continue;
-      // Une bulle dont l'objet est derrière la caméra n'a pas de place à l'écran.
-      const inFront = toAnchor.copy(entry.anchor).sub(camera.position).dot(forward) > 0.1;
-      entry.label.style.visibility = inFront ? '' : 'hidden';
-      if (!inFront) continue;
       projected.copy(entry.anchor).project(camera);
       const x = ((projected.x + 1) / 2) * width;
       const y = ((1 - projected.y) / 2) * height;
@@ -644,9 +421,6 @@ export function createRoomView(
 
   return {
     ready,
-    enter() {
-      entering = true;
-    },
     setInset(right, bottom) {
       if (inset.right === right && inset.bottom === bottom) return;
       inset.right = right;
@@ -658,15 +432,12 @@ export function createRoomView(
       goal.target.copy(focused ? focused.center : HOME_TARGET);
       goal.distance = focused ? baseDistance * FOCUS_RATIO : baseDistance;
       animating = true;
-      const stand = focused ? standPoint(focused.item.zone, characterSettings.walkArea) : null;
-      if (inside) {
-        look.eye.copy(focused && stand ? insideViewpoint(focused.item, focused.center, stand) : homeEye);
-        look.target.copy(focused ? focused.center : homeLook);
-        look.turn = look.tilt = 0;
-      }
       highlight(focused);
       for (const entry of entries) entry.label?.classList.toggle('active', entry === focused);
-      if (focused && stand) character?.walkTo(stand[0], stand[1], focused.center.x, focused.center.z);
+      if (focused && character) {
+        const [x, z] = standPoint(focused.item.zone, characterSettings.walkArea);
+        character.walkTo(x, z, focused.center.x, focused.center.z);
+      }
     },
   };
 }

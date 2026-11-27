@@ -24,7 +24,6 @@ unitaires). Voir [tests-et-ci.md](tests-et-ci.md).
 4. [Couleurs, fond et mise en page](#4-couleurs-fond-et-mise-en-page)
 5. [Animation d'arrivée et ambiance](#5-animation-darrivée-et-ambiance)
 6. [Caméra et surbrillance](#6-caméra-et-surbrillance)
-   (et [la vue intérieure](#la-vue-intérieure))
 7. [La chambre : modèle Blender et textures](#7-la-chambre--modèle-blender-et-textures)
 8. [Nouveau type de panneau](#8-nouveau-type-de-panneau)
    (et [le bonhomme](#le-bonhomme), en fin de section 7)
@@ -231,70 +230,6 @@ Fichier : `frontend/src/view.ts`, constantes en haut du fichier.
 | `controls.min…` / `controls.max…` | Jusqu'où l'utilisateur peut tourner et zoomer. |
 | Glissement de la chambre quand le panneau s'ouvre | Dans `frame()`, le `0.12` de « La vue glisse… » (plus grand = plus rapide). La place du panneau est mesurée par `syncInset` dans `main.ts`. |
 
-### La vue intérieure
-
-Le site existe en deux versions, sur deux pages qui renvoient l'une vers
-l'autre (bouton en bas à gauche) :
-
-| Version | Démo | En développement et dans PrestaShop |
-| --- | --- | --- |
-| Vue d'ensemble : la chambre vue du dehors, qu'on fait tourner | `index.html` | adresse normale |
-| Vue intérieure : on est dans la pièce, à hauteur d'yeux | `dedans.html` | `?vue=dedans` à la fin de l'adresse |
-
-Tout le reste est commun : objets cliquables, panneaux, panier, bonhomme.
-C'est le même code ; seule la caméra change (`mode` dans `view.ts`).
-
-Dans la vue intérieure : on regarde autour en glissant (souris ou doigt) ou en
-amenant la souris contre un bord de l'écran ; un clic sur un objet y fait
-voler la caméra ; fermer le panneau ramène à la place de départ.
-
-Réglages : `frontend/src/config.ts`, objet `insideView`.
-
-| Réglage | Effet |
-| --- | --- |
-| `eye` | Où se tient le visiteur en arrivant, `[x, y, z]`. |
-| `lookAt` | Le point qu'il regarde en arrivant. |
-| `characterStart` | Où le bonhomme attend dans cette vue. |
-| `fov`, `fovPortrait` | Angle de champ sur écran large et sur téléphone tenu droit. |
-| `maxTurn`, `maxTilt` | Jusqu'où on peut tourner la tête et lever ou baisser les yeux. |
-| `dragSpeed` | Ampleur du regard quand on glisse : 1 = le décor suit le doigt, 2 = deux fois plus. |
-| `edgeSpeed` | Vitesse du regard quand la souris touche un bord. |
-
-D'où la caméra regarde un objet : elle se place toute seule à côté, de biais
-par rapport au bonhomme pour qu'il ne bouche pas la vue (`insideViewpoint`
-dans `view.ts`). Si le cadrage d'un objet ne convient pas, on l'impose dans
-`config.ts` en ajoutant `viewFrom: [x, y, z]` à cet objet.
-
-**Murs, plafond et porte.** Le modèle Blender n'a que deux murs et pas de
-plafond. Pour cette vue, `frontend/src/enclosure.ts` ajoute les deux murs
-manquants, un plafond, un plafonnier et une porte, dessinés par le code ; leurs
-teintes sont relevées sur la texture de la chambre. C'est un décor provisoire :
-quand Stevens livrera la pièce fermée, il suffira de ne plus appeler
-`createEnclosure` dans `view.ts`. Pour changer ce décor en attendant :
-
-| Élément | Où, dans `enclosure.ts` |
-| --- | --- |
-| Dimensions de la pièce | `ROOM`, en haut |
-| Teinte et ombres des murs, plinthe | `paintWall` |
-| La porte et son écriteau | `paintDoor` |
-| L'affiche encadrée du mur du bureau | `paintFrame` |
-| Plafond et plafonnier | fin de `createEnclosure` |
-
-**Écran d'entrée.** En arrivant sur cette page, la chambre est vue du dehors,
-avec le titre et un bouton « Entrer dans la chambre ». On entre par ce bouton,
-en faisant défiler vers le bas, ou en glissant le doigt vers le haut ; la
-caméra plonge alors dans la pièce. Ouvrir un objet par le menu ou par un lien
-direct (`dedans.html#cd-stack`) fait entrer aussi, et `dedans.html#entrer`
-entre sans attendre (c'est le lien du bouton de la vue d'ensemble).
-
-| Élément | Où |
-| --- | --- |
-| Textes et bouton de l'écran d'entrée | `gate` dans `frontend/src/main.ts` |
-| Ce qui fait entrer (bouton, molette, doigt) | `enterRoom` et la section « Événements » de `main.ts` |
-| Son apparence | `.gate` dans `frontend/src/style.css` |
-| Cadrage de la chambre à l'écran d'entrée | `frameOutside` et `GATE_TARGET` dans `view.ts` |
-| Durée de la plongée dans la pièce | `ENTER_DURATION` dans `view.ts` |
-
 Il n'y a **aucune lumière** dans la scène : les ombres et les lumières sont
 peintes dans les textures (section 7). Pour changer l'éclairage, il faut
 refaire le rendu des textures dans Blender.
@@ -340,13 +275,12 @@ chaque **matériau** du modèle, d'après son nom dans Blender :
 5. Ouvrir http://localhost:5173/?debug et vérifier que les zones entourent
    toujours leurs objets (section 1). Si un meuble a bougé, ajuster sa zone.
 6. Si la taille de la pièce a changé : ajuster `FIT` et `HOME_TARGET`
-   (section 6), `ROOM` dans `frontend/src/enclosure.ts` et dans
-   `frontend/tests/unit/config.test.ts`.
+   (section 6) et `ROOM` dans `frontend/tests/unit/config.test.ts`.
 
 ### Netteté des textures
 
-La texture livrée fait 768 pixels pour toute la chambre : suffisant de loin,
-flou de près dans la vue intérieure. Les images d'origine qui ont servi à la
+La texture livrée fait 768 pixels pour toute la chambre : un peu floue quand on
+zoome. Les images d'origine qui ont servi à la
 peindre dans Blender (`room_baking…`, `room_ao…`) ne sont pas dans le bundle :
 on ne peut donc pas la recalculer en plus grand depuis les fichiers `.blend`.
 
@@ -535,8 +469,6 @@ plus : vérifier alors si le correctif est encore nécessaire et le retirer.
 | Page blanche sur http://localhost:8080 | Le front n'est pas compilé : `docker compose run --rm frontend-build`. |
 | « La chambre en 3D n'a pas pu s'afficher » | Le navigateur n'a pas de 3D (WebGL), ou un fichier de `src/assets/` manque : l'erreur précise est dans la console. Le menu reste utilisable. |
 | L'image clignote quand un panneau s'ouvre ou se ferme | Quelque chose redimensionne la zone 3D (`.stage` dans le CSS). Elle doit garder la taille de l'écran : voir `setInset` dans `view.ts`. |
-| Dans la vue intérieure, un objet est mal cadré ou caché | Ajouter `viewFrom: [x, y, z]` à cet objet dans `config.ts` (section 6). |
-| On voit le vide derrière un mur dans la vue intérieure | Les dimensions `ROOM` de `enclosure.ts` ne correspondent plus au modèle. |
 | Un objet ne réagit pas au clic | Ouvrir avec `?debug` : sa zone ne l'entoure plus, ou un autre meuble passe devant lui. |
 | La mauvaise chose s'éclaire au survol | Zone trop large : elle englobe les faces du voisin. |
 | La boutique locale affiche les produits fictifs | La page ne reçoit pas sa configuration : vérifier que le code source de la page contient `data-slimroom="…"`. |

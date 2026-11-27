@@ -19,11 +19,6 @@ export interface Interactable {
    * ouvrir la page avec `?debug` à la fin de l'adresse, les boîtes s'affichent.
    */
   zone: Zone;
-  /**
-   * Vue intérieure seulement : d'où regarder cet objet, [x, y, z]. Facultatif :
-   * sans lui, la caméra se place toute seule à côté de l'objet.
-   */
-  viewFrom?: [number, number, number];
   action: Action;
 }
 
@@ -120,34 +115,6 @@ export const character = {
    * sans calcul de chemin. Visible en orange avec `?debug`.
    */
   walkArea: { min: [-0.35, -1.5], max: [0.6, 2.2] } as FloorArea,
-};
-
-/**
- * Vue intérieure (page dedans.html) : on est dans la chambre, à hauteur d'yeux.
- * Positions en mètres, [x, y, z], dans le repère de la chambre.
- */
-export const insideView = {
-  /** Où se tient le visiteur en arrivant. */
-  eye: [-1.05, 1.55, 2.2] as [number, number, number],
-  /** Le point qu'il regarde en arrivant. */
-  lookAt: [0.9, 1.25, -1.6] as [number, number, number],
-  /** Où le bonhomme attend dans cette vue : [x, z]. Il se tourne vers le visiteur. */
-  characterStart: [0.45, -0.75] as [number, number],
-  /** Angle de champ, en degrés (plus grand = on voit plus large). */
-  fov: 62,
-  /** Angle de champ sur un écran plus haut que large (téléphone tenu droit). */
-  fovPortrait: 78,
-  /** Jusqu'où on peut tourner la tête depuis la position d'arrivée, en radians (π = demi-tour). */
-  maxTurn: 2.1,
-  /** Jusqu'où on peut lever ou baisser les yeux, en radians. */
-  maxTilt: 0.55,
-  /**
-   * Ampleur du regard quand on glisse (souris ou doigt). 1 = le décor suit
-   * exactement le doigt ; 2 = un même geste fait tourner deux fois plus.
-   */
-  dragSpeed: 2.2,
-  /** Vitesse du regard quand la souris touche un bord de l'écran (radians par seconde). */
-  edgeSpeed: 1.1,
 };
 
 /** Ambiance et animation d'arrivée de la scène. */

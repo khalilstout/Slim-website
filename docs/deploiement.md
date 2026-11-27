@@ -6,8 +6,7 @@ But : montrer le rendu à tout le monde, sur téléphone et ordinateur, sans
 hébergement.
 
 - Workflow : `.github/workflows/pages.yml`.
-- Adresse : https://khalilstout.github.io/Slim-website/ (vue d'ensemble) et
-  https://khalilstout.github.io/Slim-website/dedans.html (vue intérieure)
+- Adresse : https://khalilstout.github.io/Slim-website/
 - Déclenchement : chaque push sur `main` qui touche `frontend/`, ou à la main
   depuis l'onglet « Actions » du dépôt (« Run workflow »).
 - Garde-fou : le workflow relance lint, types et tests unitaires avant de

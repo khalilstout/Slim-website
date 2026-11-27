@@ -47,8 +47,6 @@ class SlimRoom extends Module
         $this->context->smarty->assign([
             'slimroom_lang' => $this->context->language->iso_code,
             'slimroom_shop_name' => Configuration::get('PS_SHOP_NAME'),
-            // Deux versions de la page : la vue d'ensemble, et la vue intérieure avec ?vue=dedans.
-            'slimroom_view' => Tools::getValue('vue') === 'dedans' ? 'inside' : 'outside',
             'slimroom_assets' => $this->getPathUri() . 'views/dist/assets/',
             // Change à chaque nouveau build : évite de servir un vieux JS depuis le cache.
             'slimroom_version' => file_exists($dist . 'room.js') ? filemtime($dist . 'room.js') : $this->version,

@@ -14,10 +14,7 @@ PrestaShop 9.
 | [docs/tests-et-ci.md](docs/tests-et-ci.md) | Les tests, la CI GitHub Actions, les contrôles de sécurité, et quoi faire quand un job est rouge. |
 | [docs/deploiement.md](docs/deploiement.md) | Démo publique GitHub Pages, et ce qu'il reste à faire pour le cloud. |
 
-Démo en ligne (produits fictifs, sans paiement) :
-
-- vue d'ensemble : https://khalilstout.github.io/Slim-website/
-- vue intérieure (prototype) : https://khalilstout.github.io/Slim-website/dedans.html
+Démo en ligne (produits fictifs, sans paiement) : https://khalilstout.github.io/Slim-website/
 
 ## Lancer en local
 
@@ -29,7 +26,7 @@ docker compose up --build
 
 La première fois, PrestaShop s'installe tout seul (quelques minutes). Ensuite :
 
-- boutique : http://localhost:8080 (vue intérieure : http://localhost:8080/?vue=dedans)
+- boutique : http://localhost:8080
 - back-office : http://localhost:8080/admin-dev — identifiants dans `docker-compose.yml`
   (valeurs de développement, à surcharger via `.env`, voir `.env.example`)
 
@@ -87,10 +84,8 @@ script du module) qu'au premier démarrage, sur des volumes vides.
 - La chambre est le modèle Blender (`bundle_001`). Il est fusionné en une seule
   pièce : les objets cliquables sont des zones réglées à la main dans
   `config.ts`, à réajuster si un meuble bouge dans une prochaine version.
-- La vue intérieure est un **prototype**. Les deux murs manquants, le plafond et
-  la porte sont dessinés par le code en attendant ceux du modèle, et la texture
-  de la chambre est un agrandissement de celle de 768 pixels : nette, mais sans
-  détail supplémentaire.
+- La texture de la chambre est un agrandissement de celle de 768 pixels : nette,
+  mais sans détail supplémentaire.
 - Le bonhomme est un modèle fabriqué par un script Blender
   (`tools/build-character.py`), d'après une photo de référence : un personnage
   stylisé, pas un portrait ni un modèle sculpté par un graphiste.

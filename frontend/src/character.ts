@@ -74,11 +74,8 @@ function joint(model: THREE.Object3D, name: string): Joint {
   };
 }
 
-export function createCharacter(
-  model: THREE.Object3D,
-  start: [number, number] = settings.start,
-  facing = settings.startFacing,
-): Character {
+export function createCharacter(model: THREE.Object3D): Character {
+  const { start, startFacing: facing } = settings;
   // Le personnage regarde vers +z ; l'origine est entre ses pieds, au sol.
   const root = new THREE.Group();
   root.name = 'character';

@@ -1,4 +1,4 @@
-"""Agrandit la texture de la chambre (768 px) en 2048 px, pour la vue intérieure.
+"""Agrandit la texture de la chambre (768 px) en 2048 px, pour qu'elle reste nette quand on zoome.
 
     python3 -m venv venv && ./venv/bin/pip install "opencv-contrib-python-headless<5" numpy
     curl -L -o EDSR_x4.pb https://github.com/Saafke/EDSR_Tensorflow/raw/master/models/EDSR_x4.pb
